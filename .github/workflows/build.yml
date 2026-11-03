@@ -21,7 +21,7 @@ jobs:
           java-version: '25'
           cache: maven
       - run: python3 tools/check-source.py
-      - run: mvn -B -Ppaper-${{ matrix.target }} verify
+      - run: mvn -B -pl paper -am -Ppaper-${{ matrix.target }} verify
       - run: |
           mkdir -p target/checks
           javac --release 21 -d target/checks common/src/main/java/uz/sentinel/guard/network/*.java tools/CoreChecks.java
@@ -30,4 +30,20 @@ jobs:
         with:
           name: SentinelGuard-paper${{ matrix.target }}
           path: paper/target/SentinelGuard-*.jar
+          if-no-files-found: error
+
+  velocity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - run: mvn -B -pl velocity -am verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SentinelGuard-velocity4.3.0
+          path: velocity/target/SentinelGuard-*.jar
           if-no-files-found: error
