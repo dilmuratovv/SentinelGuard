@@ -6,10 +6,10 @@ Status: incomplete; do not deploy as network moderation yet.
 - [x] Parent/common/Paper module structure and SentinelGuard plugin identity.
 - [x] Import explicit Paper target profiles from SentinelAC; these require independent verification.
 - [ ] SQL schema, migrations, transactional punishment service and outbox.
-- [ ] Velocity module: login enforcement, commands, disconnect and switch handling.
+- [ ] Velocity module: SQL login enforcement and online ban reconciliation implemented; commands, IP-ban and runtime tests pending.
 - [ ] Paper adapter: shared punishment store, mute/freeze, permissions and GUI.
 - [ ] Redis invalidation plus SQL reconciliation on reconnect.
-- [ ] SentinelAC flag adapter, deduplication, bounded aggregation; automatic bans disabled by default.
+- [x] Optional automatic SentinelAC core-flag observer, bounded queue and per-check Sus threshold. Runtime verification pending.
 - [ ] Import legacy YAML without changing original data.
 - [ ] Fix IPv6, GUI permission checks, configurable slots, reload/save behavior.
 - [ ] Integration tests: MariaDB + Redis + Velocity + two Paper servers.
