@@ -1,0 +1,350 @@
+# ====================================================== #
+#           SentinelGuard Moderation & Ban Configuration         #
+#                      Version 1.2.1                     #
+# ====================================================== #
+
+prefix: "&8[&cSentinelGuard&8] "
+
+settings:
+  save-interval-minutes: 5
+  sound-effects: true
+  auto-unfreeze-on-leave: false
+
+punishment-formats:
+  permanent-text: "Doimiy (Abadiy)"
+  never-text: "Hech qachon"
+
+# Chat broadcasts when punishment is issued
+punishment-broadcasts:
+  ban:
+    - "&8&m----------------------------------------------------"
+    - "&c&l[JAZO] &fO'yinchi &e{player} &cserverdan chetlashtirildi!"
+    - "&7▎ &fJazo turi: &cBan"
+    - "&7▎ &fSabab: &e{reason}"
+    - "&7▎ &fMuddat: &a{duration}"
+    - "&7▎ &fModerator: &b{staff}"
+    - "&8&m----------------------------------------------------"
+
+  ip_ban:
+    - "&8&m----------------------------------------------------"
+    - "&4&l[IP-BAN] &fO'yinchi &e{player} &4IP bo'yicha banlandi!"
+    - "&7▎ &fJazo turi: &4IP-Ban"
+    - "&7▎ &fSabab: &e{reason}"
+    - "&7▎ &fMuddat: &a{duration}"
+    - "&7▎ &fModerator: &b{staff}"
+    - "&8&m----------------------------------------------------"
+
+  mute:
+    - "&8&m----------------------------------------------------"
+    - "&e&l[JAZO] &fO'yinchi &e{player} &eovozi o'chirildi (Mute)!"
+    - "&7▎ &fJazo turi: &eMute"
+    - "&7▎ &fSabab: &f{reason}"
+    - "&7▎ &fMuddat: &a{duration}"
+    - "&7▎ &fModerator: &b{staff}"
+    - "&8&m----------------------------------------------------"
+
+  kick:
+    - "&8&m----------------------------------------------------"
+    - "&6&l[JAZO] &fO'yinchi &e{player} &6serverdan chiqarib yuborildi!"
+    - "&7▎ &fJazo turi: &6Kick"
+    - "&7▎ &fSabab: &e{reason}"
+    - "&7▎ &fModerator: &b{staff}"
+    - "&8&m----------------------------------------------------"
+
+  warn:
+    - "&8&m----------------------------------------------------"
+    - "&d&l[OGOHLANTIRISH] &fO'yinchi &e{player} &dogohlantirish oldi!"
+    - "&7▎ &fSabab: &e{reason}"
+    - "&7▎ &fModerator: &b{staff}"
+    - "&8&m----------------------------------------------------"
+
+  silent-format: "&8[&7SILENT&8] &b{staff} &7o'yinchi &e{player}&7ni jazoladi (&c{type}&7) - Sabab: &f{reason}&7, Muddat: &a{duration}"
+
+  default:
+    - "&8[&cSentinelGuard&8] &e{player} &cjazolandi (&e{type_formatted}&c)! Sabab: &f{reason}"
+
+# Broadcasts when punishment is lifted/unpunished
+unpunish-broadcasts:
+  unban:
+    - "&8&m----------------------------------------------------"
+    - "&a&l[AFV] &fO'yinchi &e{player}&fning &aBani &fbekor qilindi!"
+    - "&7▎ &fSabab: &e{reason}"
+    - "&7▎ &fModerator: &b{staff}"
+    - "&8&m----------------------------------------------------"
+
+  unipban:
+    - "&8&m----------------------------------------------------"
+    - "&a&l[AFV] &fIP manzil &e{player}&fning &aIP-Bani &fbekor qilindi!"
+    - "&7▎ &fSabab: &e{reason}"
+    - "&7▎ &fModerator: &b{staff}"
+    - "&8&m----------------------------------------------------"
+
+  unmute:
+    - "&8&m----------------------------------------------------"
+    - "&a&l[AFV] &fO'yinchi &e{player}&fning &aMute &fjazosi olib tashlandi!"
+    - "&7▎ &fSabab: &e{reason}"
+    - "&7▎ &fModerator: &b{staff}"
+    - "&8&m----------------------------------------------------"
+
+  silent-format: "&8[&7SILENT&8] &b{staff} &7o'yinchi &e{player}&7ning &a{type}&7 jazosini bekor qildi. Sabab: &f{reason}"
+
+# Custom Ban Screen (Shown upon disconnect / when banned player tries to join)
+ban-screen-format:
+  - "&c&l━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  - "&4&lSERVERDAN CHETLASHTIRILDINGIZ &7(BAN)"
+  - ""
+  - "&fSabab: &c{reason}"
+  - "&fJazo turi: &e{type}"
+  - "&fModerator: &b{staff}"
+  - "&fMuddat: &a{duration}"
+  - "&fQolgan vaqt: &6{remaining}"
+  - "&fTugash vaqti: &7{expires}"
+  - "&fJazo kodi: &8{id}"
+  - ""
+  - "&eApellyatsiya yoki murojaat uchun Discord:"
+  - "&bdiscord.gg/yourserver"
+  - "&c&l━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Message sent to muted player attempting to chat
+mute-chat-blocked-message:
+  - "&8&m----------------------------------------------------"
+  - "&c&l[!] &cSiz server chatida gapira olmaysiz (Mute)!"
+  - "&7▎ &fSabab: &e{reason}"
+  - "&7▎ &fQolgan vaqt: &a{remaining}"
+  - "&7▎ &fModerator: &b{staff}"
+  - "&7▎ &fJazo kodi: &8{id}"
+  - "&8&m----------------------------------------------------"
+
+# Auto-punishment escalation when warns reach thresholds
+warn-settings:
+  thresholds:
+    "3": "mute 1h"
+    "5": "ban 1d"
+    "10": "ban perm"
+
+# Staff chat & Alt alerts
+staff-chat-format: "&8[&cStaffChat&8] &b{staff}&8: &f{message}"
+alt-alert-format: "&8[&cALT-OGOHLANTIRISH&8] &e{player} &7o'yinchi banlangan &c{banned_player}&7 bilan bir xil IP orqali kirdi!"
+
+# Freeze System Settings
+freeze:
+  title: "&c&lMUZLATILDINGIZ!"
+  subtitle: "&eTekshiruv uchun Discord serverimizga kiring!"
+  actionbar: "&c&lHarakatlanish va chat yopildi! Discord: &fdiscord.gg/yourserver"
+  auto-ban-on-leave: true
+  auto-ban-duration-days: 30
+  auto-ban-reason: "Tekshiruv (SS) paytida serverdan chiqish"
+  message:
+    - "&7============================================="
+    - "&c&lDIQQAT! &fSiz tekshiruv uchun muzlatildingiz!"
+    - "&eDiscord serverimizga kiring va moderatorga murojaat qiling."
+    - "&fMuddatingiz: &a5 daqiqa"
+    - "&cServerdan chiqish taqiqlanadi (Avto-ban bo'lasiz)!"
+    - "&7============================================="
+  allowed-commands:
+    - "/helpop"
+    - "/msg"
+    - "/reply"
+    - "/r"
+    - "/sc"
+
+# General Messages
+messages:
+  no-permission: "&cBu amaldan foydalanish uchun ruxsatingiz yetarli emas!"
+  cannot-target-staff: "&cBu o'yinchiga nisbatan ushbu amalni bajarib bo'lmaydi! (Admin/Staff himoyasi)"
+  reload-success: "&aGuard sozlamalari va ma'lumotlari muvaffaqiyatli qayta yuklandi!"
+  player-not-found: "&cO'yinchi topilmadi yoki oflayn!"
+  cannot-sus-admin: "&cBu o'yinchiga nisbatan ushbu amalni bajarib bo'lmaydi! (Admin/Staff himoyasi)"
+  add-sus-usage: "&cSintaksis xato! Foydalanish: &f/addsus <o'yinchi> <sabab>"
+  add-sus-success: "&aO'yinchi &e{player} &ashubhali ro'yxatga olindi! Sabab: &c{reason} &7(Jami: {count}x)"
+  clear-sus-success: "&aBarcha shubhali o'yinchilar ro'yxati tozalandi! (&e{count} &ao'yinchi)"
+  freeze-usage: "&cSintaksis xato! Foydalanish: &f/freeze <o'yinchi>"
+  freeze-success: "&aO'yinchi &e{player} &amuvaffaqiyatli muzlatildi!"
+  already-frozen: "&cO'yinchi &e{player} &callaqachon muzlatilgan!"
+  unfreeze-usage: "&cSintaksis xato! Foydalanish: &f/unfreeze <o'yinchi>"
+  unfreeze-success: "&aO'yinchi &e{player} &amuvaffaqiyatli muzdan chiqarildi!"
+  not-frozen: "&cO'yinchi &e{player} &cmuzlatilmagan!"
+  cannot-freeze-self: "&cSiz o'zingizni muzlata olmaysiz!"
+  prompt-add-reason: "&e&l[!] &f{player} &eo'yinchisi uchun yangi shubha sababini chatda yozing (bekor qilish uchun '&ccancel&e' deb yozing):"
+  add-reason-cancelled: "&cShubha sababini qo'shish bekor qilindi."
+  add-reason-success: "&aO'yinchiga yangi shubha sababi qo'shildi: &c{reason}"
+  removed-from-sus: "&aO'yinchi &e{player} &ashubhali ro'yxatdan olib tashlandi!"
+  teleport-target-to-me: "&aO'yinchi &e{player} &asizning yoningizga teleport qilindi!"
+  teleport-me-to-target: "&aSiz o'yinchi &e{player} &eyoniga teleport bo'ldingiz!"
+  kick-reason-default: "Moderator tomonidan serverdan chiqarildingiz!"
+
+# Main /sus GUI (54 Slots Pagination)
+main-gui:
+  title: "&8&lSus Monitoring &7(Sahifa {page}/{max_pages})"
+  size: 54
+  filler:
+    material: "GRAY_STAINED_GLASS_PANE"
+    name: " "
+  empty-item:
+    material: "BARRIER"
+    name: "&cShubhali o'yinchilar yo'q"
+    lore:
+      - "&7Ayni damda shubhali ro'yxatda"
+      - "&7hech qanday o'yinchi mavjud emas."
+  player-head:
+    name: "&c&l{player}"
+    lore:
+      - "&7------------------------------"
+      - "&fHolati: {status}"
+      - "&fMuzlatilgan: {frozen}"
+      - "&fJami flaglar: &c{total_flags}x"
+      - "&7------------------------------"
+      - "&fJazolar statistikasi:"
+      - " &7- &cBanlar soni: &e{total_bans} ta &8({active_ban})"
+      - " &7- &eMutelar soni: &e{total_mutes} ta &8({active_mute})"
+      - " &7- &dOgohlantirishlar: &e{total_warns} ta"
+      - " &7- &6Kicklar soni: &e{total_kicks} ta"
+      - "&7------------------------------"
+      - "&e&lShubha sabablari:"
+      - "{reasons}"
+      - "&7------------------------------"
+      - "&a» Chap: &fBoshqaruv &7| &e» O'ng: &fFreeze"
+      - "&c» Shift+Chap: &fTarix &7| &b» Shift+O'ng: &fTP"
+    status-online: "&aOnlayn"
+    status-offline: "&7Oflayn"
+    frozen-yes: "&cHa"
+    frozen-no: "&aYo'q"
+    reason-format: " &7- &e{reason}: &c{count}x"
+  previous-page:
+    slot: 45
+    material: "ARROW"
+    name: "&a« Oldingi sahifa"
+    lore:
+      - "&7Sahifa: &e{prev_page}"
+  info-button:
+    slot: 49
+    material: "NETHER_STAR"
+    name: "&6&lServer Monitoring Statistikasi"
+    lore:
+      - "&7------------------------------"
+      - "&fJami shubhali o'yinchilar: &e{total_players}"
+      - "&fJami shubha flaglari: &c{total_flags}x"
+      - "&fFaol banlar: &c{active_bans} &7(Jami: &e{total_bans}&7)"
+      - "&fFaol mutelar: &e{active_mutes} &7(Jami: &e{total_mutes}&7)"
+      - "&fBerilgan ogohlantirishlar: &d{total_warns} ta"
+      - "&fServerdan chiqarishlar: &6{total_kicks} ta"
+      - "&7------------------------------"
+      - "&fJoriy sahifa: &a{page}/{max_pages}"
+  next-page:
+    slot: 53
+    material: "ARROW"
+    name: "&aKeyingi sahifa »"
+    lore:
+      - "&7Sahifa: &e{next_page}"
+
+# Player Management GUI (27 Slots Menu)
+control-gui:
+  title: "&8&lBoshqaruv: &c{player}"
+  size: 27
+  filler:
+    material: "BLACK_STAINED_GLASS_PANE"
+    name: " "
+  target-head-slot: 4
+  back-button:
+    slot: 22
+    material: "BARRIER"
+    name: "&c« Orqaga"
+    lore:
+      - "&7Asosiy menyuga qaytish"
+  buttons:
+    add-reason:
+      slot: 10
+      material: "WRITABLE_BOOK"
+      name: "&e&l1. Add Sus Reason"
+      lore:
+        - "&7O'yinchiga yangi shubha sababini"
+        - "&7qo'lda chat orqali kiritish."
+        - ""
+        - "&a» Bosib sabab kiriting"
+
+    history:
+      slot: 11
+      material: "BOOK"
+      name: "&b&l2. Log / History"
+      lore:
+        - "&7O'yinchining barcha avvalgi jazolari"
+        - "&7va shubhalar tarixini ko'rish."
+        - ""
+        - "&a» Bosib tarixni ko'ring"
+
+    freeze:
+      slot: 12
+      material: "ICE"
+      name: "&3&l3. Freeze / Unfreeze"
+      lore:
+        - "&7Hozirgi holat: {frozen_status}"
+        - "&7Muzlaganda harakatlana olmaydi,"
+        - "&7chat va buyruqlar yopiladi."
+        - ""
+        - "&a» Bosib holatni o'zgartiring"
+
+    tp-here:
+      slot: 13
+      material: "ENDER_PEARL"
+      name: "&a&l4. TP (Player to Me)"
+      lore:
+        - "&7O'yinchini sizning yoningizga"
+        - "&7teleport qilish."
+        - ""
+        - "&a» Bosib teleport qiling"
+
+    tp-to:
+      slot: 14
+      material: "COMPASS"
+      name: "&6&l5. TP (Me to Player)"
+      lore:
+        - "&7Sizni o'yinchi yoniga"
+        - "&7teleport qilish."
+        - ""
+        - "&a» Bosib o'yinchi yoniga o'ting"
+
+    punish:
+      slot: 15
+      material: "NETHERITE_SWORD"
+      name: "&c&l6. Quick Punish"
+      lore:
+        - "&7Tezkor 1-bosish bilan Ban,"
+        - "&7Mute va Ogohlantirish berish."
+        - ""
+        - "&c» Bosib menyuni oching"
+
+    kick:
+      slot: 16
+      material: "REDSTONE"
+      name: "&e&l7. Kick"
+      lore:
+        - "&7O'yinchini serverdan chiqarib"
+        - "&7yuborish."
+        - ""
+        - "&e» Bosib kick qiling"
+
+    alts:
+      slot: 17
+      material: "SPYGLASS"
+      name: "&d&l8. Check Alts / IP"
+      lore:
+        - "&7O'yinchining barcha boshqa"
+        - "&7akkauntlarini ko'rish."
+        - ""
+        - "&d» Bosib tekshiring"
+
+    remove-sus:
+      slot: 18
+      material: "ANVIL"
+      name: "&4&l9. Remove from Sus"
+      lore:
+        - "&7O'yinchini shubhali ro'yxatdan"
+        - "&7to'liq olib tashlash."
+        - ""
+        - "&4» Bosib ro'yxatdan o'chiring"
+
+# Optional; SentinelGuard also runs without SentinelAC.
+integrations:
+  sentinelac:
+    enabled: true
+    sus-threshold: 10
