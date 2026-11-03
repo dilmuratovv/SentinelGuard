@@ -1,0 +1,33 @@
+name: Build and check
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ['1.21', '1.21.1', '1.21.3', '1.21.4', '1.21.5', '1.21.6', '1.21.7', '1.21.8', '1.21.9', '1.21.10', '1.21.11', '26.1.1', '26.1.2', '26.2', '26.3']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - run: python3 tools/check-source.py
+      - run: mvn -B -Ppaper-${{ matrix.target }} verify
+      - run: |
+          mkdir -p target/checks
+          javac --release 21 -d target/checks common/src/main/java/uz/sentinel/guard/network/*.java tools/CoreChecks.java
+          java -cp target/checks CoreChecks
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SentinelGuard-paper${{ matrix.target }}
+          path: paper/target/SentinelGuard-*.jar
+          if-no-files-found: error

@@ -1,0 +1,174 @@
+name: SentinelGuard
+version: '${project.version}'
+main: me.azicoo.guard.GuardPlugin
+api-version: '${guard.api}'
+authors: [ azicoo ]
+softdepend: [ SentinelAC ]
+description: SentinelGuard network moderation (development build)
+
+permissions:
+  guard.admin:
+    description: Full administrative access to Guard plugin.
+    default: op
+  guard.staff:
+    description: Access to moderation commands and broadcasts.
+    default: op
+  guard.ban:
+    description: Permission to ban players.
+    default: op
+  guard.unban:
+    description: Permission to unban players.
+    default: op
+  guard.ipban:
+    description: Permission to IP-ban players.
+    default: op
+  guard.unbanip:
+    description: Permission to unban IP addresses.
+    default: op
+  guard.mute:
+    description: Permission to mute players.
+    default: op
+  guard.unmute:
+    description: Permission to unmute players.
+    default: op
+  guard.kick:
+    description: Permission to kick players.
+    default: op
+  guard.warn:
+    description: Permission to warn players.
+    default: op
+  guard.unwarn:
+    description: Permission to unwarn players.
+    default: op
+  guard.history:
+    description: Permission to view player punishment and sus history.
+    default: op
+  guard.alts:
+    description: Permission to view alternate accounts and IP records.
+    default: op
+  guard.staffchat:
+    description: Permission to use and view staff chat.
+    default: op
+  guard.staffhistory:
+    description: Permission to view staff punishment history.
+    default: op
+  guard.freeze:
+    description: Permission to freeze and unfreeze players.
+    default: op
+  guard.admin.bypass:
+    description: Immunity from being banned, muted, or frozen.
+    default: false
+  sus.admin:
+    description: Legacy permission for sus monitoring and freeze.
+    default: op
+
+commands:
+  ban:
+    description: Ban a player permanently or temporarily.
+    aliases: [ tempban, tban ]
+    permission: guard.ban
+    usage: /ban <player> [duration] [reason] [-s]
+
+  unban:
+    description: Unban a banned player.
+    aliases: [ pardon ]
+    permission: guard.unban
+    usage: /unban <player> [reason] [-s]
+
+  ipban:
+    description: Ban an IP or player permanently or temporarily.
+    aliases: [ ban-ip, tempipban ]
+    permission: guard.ipban
+    usage: /ipban <player|ip> [duration] [reason] [-s]
+
+  unbanip:
+    description: Unban an IP address.
+    aliases: [ pardonip ]
+    permission: guard.unbanip
+    usage: /unbanip <ip> [reason] [-s]
+
+  mute:
+    description: Mute a player in chat permanently or temporarily.
+    aliases: [ tempmute, tmute ]
+    permission: guard.mute
+    usage: /mute <player> [duration] [reason] [-s]
+
+  unmute:
+    description: Unmute a muted player.
+    permission: guard.unmute
+    usage: /unmute <player> [reason] [-s]
+
+  kick:
+    description: Kick a player from the server.
+    permission: guard.kick
+    usage: /kick <player> [reason] [-s]
+
+  warn:
+    description: Warn a player.
+    permission: guard.warn
+    usage: /warn <player> [reason] [-s]
+
+  unwarn:
+    description: Remove warnings from a player.
+    permission: guard.unwarn
+    usage: /unwarn <player> <id|all>
+
+  warnings:
+    description: Check active warnings for a player.
+    permission: guard.warn
+    usage: /warnings <player>
+
+  history:
+    description: Open the punishment and suspicious history GUI.
+    aliases: [ check, punishments, modlogs ]
+    permission: guard.history
+    usage: /history <player>
+
+  alts:
+    description: Check alternate accounts and IP logins for a player.
+    aliases: [ dupeip ]
+    permission: guard.alts
+    usage: /alts <player|ip>
+
+  staffchat:
+    description: Send a private message to all online staff members.
+    aliases: [ sc ]
+    permission: guard.staffchat
+    usage: /staffchat <message>
+
+  staffhistory:
+    description: View punishment history performed by a staff member.
+    permission: guard.staffhistory
+    usage: /staffhistory <staff>
+
+  sus:
+    description: Open the suspicious players GUI or reload configuration.
+    permission: sus.admin
+    usage: /sus [reload]
+
+  addsus:
+    description: Add a player to the suspicious list with a reason.
+    permission: sus.admin
+    usage: /addsus <player> <reason>
+
+  clearsus:
+    description: Clear the list of suspicious players.
+    permission: sus.admin
+    usage: /clearsus
+
+  freeze:
+    description: Freeze a player, blocking movement and chat.
+    aliases: [ ss ]
+    permission: sus.admin
+    usage: /freeze <player>
+
+  unfreeze:
+    description: Unfreeze a player.
+    permission: sus.admin
+    usage: /unfreeze <player>
+
+  sg:
+    aliases: [ sentinelguard, sguard, sentinelg ]
+    description: Guard plugin main command and reload.
+    permission: guard.admin
+    usage: /sg [reload|help|info]

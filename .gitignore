@@ -1,0 +1,6 @@
+**/target/
+.tools/
+backup/
+*.jar
+.idea/
+*.log
