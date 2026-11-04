@@ -1,10 +1,15 @@
 name: SentinelGuard
 version: '${project.version}'
-main: me.azicoo.guard.GuardPlugin
+main: uz.sentinel.guard.paper.GuardPlugin
 api-version: '${guard.api}'
 authors: [ azicoo ]
 softdepend: [ SentinelAC ]
-description: SentinelGuard network moderation (development build)
+# Loaded by Paper's library loader from Maven Central; only used in network mode.
+libraries:
+  - com.zaxxer:HikariCP:${hikari.version}
+  - org.mariadb.jdbc:mariadb-java-client:${mariadb.version}
+  - redis.clients:jedis:${jedis.version}
+description: SentinelGuard network moderation
 
 permissions:
   guard.admin:
@@ -171,4 +176,4 @@ commands:
     aliases: [ sentinelguard, sguard, sentinelg ]
     description: Guard plugin main command and reload.
     permission: guard.admin
-    usage: /sg [reload|help|info]
+    usage: /sg [reload|status|stats|import-legacy|help|info]

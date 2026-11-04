@@ -1,0 +1,190 @@
+{
+  "servers": [
+    {
+      "version": "1.21",
+      "build": 130,
+      "channel": "STABLE",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/ab9bb1afc3cea6978a0c03ce8448aa654fe8a9c4dddf341e7cbda1b0edaa73f5/paper-1.21-130.jar",
+      "sha256": "ab9bb1afc3cea6978a0c03ce8448aa654fe8a9c4dddf341e7cbda1b0edaa73f5",
+      "filename": "paper-1.21-130.jar"
+    },
+    {
+      "version": "1.21.1",
+      "build": 133,
+      "channel": "STABLE",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/39bd8c00b9e18de91dcabd3cc3dcfa5328685a53b7187a2f63280c22e2d287b9/paper-1.21.1-133.jar",
+      "sha256": "39bd8c00b9e18de91dcabd3cc3dcfa5328685a53b7187a2f63280c22e2d287b9",
+      "filename": "paper-1.21.1-133.jar"
+    },
+    {
+      "version": "1.21.3",
+      "build": 83,
+      "channel": "STABLE",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/87e973e1d338e869e7fdbc4b8fadc1579d7bb0246a0e0cf6e5700ace6c8bc17e/paper-1.21.3-83.jar",
+      "sha256": "87e973e1d338e869e7fdbc4b8fadc1579d7bb0246a0e0cf6e5700ace6c8bc17e",
+      "filename": "paper-1.21.3-83.jar"
+    },
+    {
+      "version": "1.21.4",
+      "build": 232,
+      "channel": "STABLE",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/5ee4f542f628a14c644410b08c94ea42e772ef4d29fe92973636b6813d4eaffc/paper-1.21.4-232.jar",
+      "sha256": "5ee4f542f628a14c644410b08c94ea42e772ef4d29fe92973636b6813d4eaffc",
+      "filename": "paper-1.21.4-232.jar"
+    },
+    {
+      "version": "1.21.5",
+      "build": 114,
+      "channel": "ALPHA",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/2ae6ae22adf417699746e0f89fc2ef6cb6ee050a5f6608cee58f0535d60b509e/paper-1.21.5-114.jar",
+      "sha256": "2ae6ae22adf417699746e0f89fc2ef6cb6ee050a5f6608cee58f0535d60b509e",
+      "filename": "paper-1.21.5-114.jar"
+    },
+    {
+      "version": "1.21.6",
+      "build": 48,
+      "channel": "STABLE",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/35e2dfa66b3491b9d2f0bb033679fa5aca1e1fdf097e7a06a80ce8afeda5c214/paper-1.21.6-48.jar",
+      "sha256": "35e2dfa66b3491b9d2f0bb033679fa5aca1e1fdf097e7a06a80ce8afeda5c214",
+      "filename": "paper-1.21.6-48.jar"
+    },
+    {
+      "version": "1.21.7",
+      "build": 32,
+      "channel": "STABLE",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/83838188699cb2837e55b890fb1a1d39ad0710285ed633fbf9fc14e9f47ce078/paper-1.21.7-32.jar",
+      "sha256": "83838188699cb2837e55b890fb1a1d39ad0710285ed633fbf9fc14e9f47ce078",
+      "filename": "paper-1.21.7-32.jar"
+    },
+    {
+      "version": "1.21.8",
+      "build": 60,
+      "channel": "STABLE",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/8de7c52c3b02403503d16fac58003f1efef7dd7a0256786843927fa92ee57f1e/paper-1.21.8-60.jar",
+      "sha256": "8de7c52c3b02403503d16fac58003f1efef7dd7a0256786843927fa92ee57f1e",
+      "filename": "paper-1.21.8-60.jar"
+    },
+    {
+      "version": "1.21.9",
+      "build": 59,
+      "channel": "ALPHA",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/aec002e77c7566e49494fdf05430b96078ffd1d7430e652d4f338fef951e7a10/paper-1.21.9-59.jar",
+      "sha256": "aec002e77c7566e49494fdf05430b96078ffd1d7430e652d4f338fef951e7a10",
+      "filename": "paper-1.21.9-59.jar"
+    },
+    {
+      "version": "1.21.10",
+      "build": 130,
+      "channel": "STABLE",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/158703f75a26f842ea656b3dc6d75bf3d1ec176b97a2c36384d0b80b3871af53/paper-1.21.10-130.jar",
+      "sha256": "158703f75a26f842ea656b3dc6d75bf3d1ec176b97a2c36384d0b80b3871af53",
+      "filename": "paper-1.21.10-130.jar"
+    },
+    {
+      "version": "1.21.11",
+      "build": 132,
+      "channel": "STABLE",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/5ffef465eeeb5f2a3c23a24419d97c51afd7dbb4923ff42df9a3f58bba1ccfba/paper-1.21.11-132.jar",
+      "sha256": "5ffef465eeeb5f2a3c23a24419d97c51afd7dbb4923ff42df9a3f58bba1ccfba",
+      "filename": "paper-1.21.11-132.jar"
+    },
+    {
+      "version": "26.1.1",
+      "build": 29,
+      "channel": "ALPHA",
+      "java": 25,
+      "url": "https://fill-data.papermc.io/v1/objects/43d08ed52c7af4e9f72769122501a5c15f99c7ace0c428a3eef040fd3f6fdbc5/paper-26.1.1-29.jar",
+      "sha256": "43d08ed52c7af4e9f72769122501a5c15f99c7ace0c428a3eef040fd3f6fdbc5",
+      "filename": "paper-26.1.1-29.jar"
+    },
+    {
+      "version": "26.1.2",
+      "build": 74,
+      "channel": "STABLE",
+      "java": 25,
+      "url": "https://fill-data.papermc.io/v1/objects/1d70b1dab9cf4a6de615209a536f3a45a2186240253c428213ce2188ab95e5f7/paper-26.1.2-74.jar",
+      "sha256": "1d70b1dab9cf4a6de615209a536f3a45a2186240253c428213ce2188ab95e5f7",
+      "filename": "paper-26.1.2-74.jar"
+    },
+    {
+      "version": "26.2",
+      "build": 135,
+      "channel": "STABLE",
+      "java": 25,
+      "url": "https://fill-data.papermc.io/v1/objects/ef3dbc68b013deafdbbee3bebf1ba351671ebcda94a8f136809b7532d5ba2fe1/paper-26.2-135.jar",
+      "sha256": "ef3dbc68b013deafdbbee3bebf1ba351671ebcda94a8f136809b7532d5ba2fe1",
+      "filename": "paper-26.2-135.jar"
+    },
+    {
+      "version": "26.3",
+      "build": 230,
+      "channel": "STABLE",
+      "java": 25,
+      "url": "https://fill-data.papermc.io/v1/objects/c0df92ce1d93617dd406b50aa823c85f0bdc3cee7528ee9a60a80df0fad5d350/paper-26.3-230.jar",
+      "sha256": "c0df92ce1d93617dd406b50aa823c85f0bdc3cee7528ee9a60a80df0fad5d350",
+      "filename": "paper-26.3-230.jar"
+    }
+  ],
+  "unavailable": {
+    "1.21.2": "No published Paper build",
+    "26.1": "Paper publishes this line as 26.1.1 and 26.1.2"
+  },
+  "velocity": [
+    {
+      "version": "3.5.1",
+      "build": 615,
+      "channel": "RECOMMENDED",
+      "java": 21,
+      "url": "https://fill-data.papermc.io/v1/objects/b4e3164df5377346854dc6cb9e6a78022b1946ff69e89676313f5f6f1c6f0fb3/velocity-3.5.1-615.jar",
+      "sha256": "b4e3164df5377346854dc6cb9e6a78022b1946ff69e89676313f5f6f1c6f0fb3",
+      "filename": "velocity-3.5.1-615.jar"
+    },
+    {
+      "version": "4.1.1",
+      "build": 24,
+      "channel": "STABLE",
+      "java": 25,
+      "url": "https://fill-data.papermc.io/v1/objects/846411d2d0560fed0f23496ffb89681be528d2c0650ecdcf21724d2d7bd9c1ee/velocity-4.1.1-24.jar",
+      "sha256": "846411d2d0560fed0f23496ffb89681be528d2c0650ecdcf21724d2d7bd9c1ee",
+      "filename": "velocity-4.1.1-24.jar"
+    },
+    {
+      "version": "4.2.0",
+      "build": 30,
+      "channel": "STABLE",
+      "java": 25,
+      "url": "https://fill-data.papermc.io/v1/objects/35a5596a5468a035d8a32c8de5ebb0dc6b8d8f0cc3ff5169d514aca762af8aa8/velocity-4.2.0-30.jar",
+      "sha256": "35a5596a5468a035d8a32c8de5ebb0dc6b8d8f0cc3ff5169d514aca762af8aa8",
+      "filename": "velocity-4.2.0-30.jar"
+    },
+    {
+      "version": "4.3.0",
+      "build": 44,
+      "channel": "STABLE",
+      "java": 25,
+      "url": "https://fill-data.papermc.io/v1/objects/85be73b90f295acd8d5d45a00ad10bac791d4b72b7554172612a89565ebaaa8f/velocity-4.3.0-44.jar",
+      "sha256": "85be73b90f295acd8d5d45a00ad10bac791d4b72b7554172612a89565ebaaa8f",
+      "filename": "velocity-4.3.0-44.jar"
+    },
+    {
+      "version": "4.3.1",
+      "build": 45,
+      "channel": "STABLE",
+      "java": 25,
+      "url": "https://fill-data.papermc.io/v1/objects/0844bcabdcdb4f5b875906fd4c3365bc1bb76918e42bc595ed88ad195258dd75/velocity-4.3.1-45.jar",
+      "sha256": "0844bcabdcdb4f5b875906fd4c3365bc1bb76918e42bc595ed88ad195258dd75",
+      "filename": "velocity-4.3.1-45.jar"
+    }
+  ]
+}
