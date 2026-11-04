@@ -4,3 +4,5 @@ backup/
 *.jar
 .idea/
 *.log
+node_modules/
+.internal/

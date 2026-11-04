@@ -1,6 +1,6 @@
 # ====================================================== #
 #           SentinelGuard Moderation & Ban Configuration         #
-#                      Version 1.2.1                     #
+#                      Version 2.0.0                     #
 # ====================================================== #
 
 prefix: "&8[&cSentinelGuard&8] "
@@ -348,3 +348,43 @@ integrations:
   sentinelac:
     enabled: true
     sus-threshold: 10
+
+# ------------------------------------------------------ #
+# Network mode (Velocity + several Paper servers)
+# MariaDB is authoritative. Every server with the same database shares bans, IP bans,
+# mutes, warnings and history. Redis is optional: it only speeds up propagation and
+# carries staff chat; SQL polling keeps servers correct without it.
+# Freeze stays per-server: it is live state on the server the player is on.
+# Changing this section requires a server restart.
+# ------------------------------------------------------ #
+network:
+  enabled: false
+  # Unique, stable name of this Paper server (used in history and legacy import ids).
+  server-id: "survival"
+  database:
+    jdbc-url: "jdbc:mariadb://127.0.0.1:3306/sentinelguard"
+    username: "sentinelguard"
+    password: ""
+    pool-size: 4
+  # If the database is unreachable: true = deny logins (bans are never bypassed), false = allow.
+  deny-login-on-database-error: true
+  database-error-login: "&cModeratsiya xizmati vaqtincha ishlamayapti. Keyinroq qayta urinib ko'ring."
+  database-error-command: "&cMa'lumotlar bazasi xatosi: amal saqlanmadi. Keyinroq qayta urinib ko'ring."
+  # How often committed changes from other servers are read (20 ticks = 1 second).
+  poll-interval-ticks: 40
+  # Days of change history kept in the sg_outbox table. Servers re-sync from the database on start,
+  # so old events are not needed; keep this above the longest outage you want to ride out live.
+  outbox-retention-days: 7
+  # Recent punishments kept in memory at startup; history commands always read the full history.
+  cache-size: 20000
+  history-limit: 500
+  # Copy the old punishments.yml into the database on start. Safe to repeat; the file is never changed.
+  import-legacy-on-start: true
+  # Also broadcast punishments issued on other servers.
+  broadcast-remote-punishments: false
+  staff-chat-format: "&8[&cStaffChat&8] &7[{server}] &b{staff}&8: &f{message}"
+  redis:
+    enabled: false
+    # Put a password in the uri, e.g. redis://:password@host:6379 (Redis carries signals and staff chat only).
+    uri: "redis://127.0.0.1:6379"
+    channel: "sentinelguard"

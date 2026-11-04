@@ -1,0 +1,9 @@
+{
+  "name": "sentinelguard-network-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Localhost test clients only; not bundled into SentinelGuard",
+  "dependencies": {
+    "minecraft-protocol": "1.68.0"
+  }
+}
