@@ -62,7 +62,7 @@ jobs:
           path: dist
       - name: Resolve the Paper ${{ matrix.target }} API
         run: |
-          mvn -B -q -pl common install -DskipTests
+          mvn -B -q -pl common -am install -DskipTests
           mvn -B -q -pl paper -Ppaper-${{ matrix.target }} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.outputFile="$PWD/classpath.txt"
       - name: Check the JAR links against Paper ${{ matrix.target }}
         run: python3 tools/api_compat.py --jar dist/SentinelGuard-*-paper.jar --classpath "$(cat classpath.txt)"
@@ -87,13 +87,15 @@ jobs:
           path: dist
       - name: Resolve the Velocity ${{ matrix.target }} API
         run: |
-          mvn -B -q -pl common install -DskipTests
+          mvn -B -q -pl common -am install -DskipTests
           mvn -B -q -pl velocity -Pvelocity-${{ matrix.target }} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.outputFile="$PWD/classpath.txt"
       - name: Check the JAR links against Velocity ${{ matrix.target }}
         run: python3 tools/api_compat.py --jar dist/SentinelGuard-*-velocity.jar --classpath "$(cat classpath.txt)"
 
   # MariaDB + Redis + Velocity + two Paper servers with real clients (tools/network_smoke.py).
-  # The same two JARs are booted on the oldest and newest servers and on every Velocity version.
+  # The same two JARs are booted on Paper 1.21.11 with every Velocity version. Other Paper versions are
+  # covered by the api-paper link check: Paper 1.21 crashes on Java 25 (spark profiler) and the test client
+  # (mineflayer) has no protocol data for Paper 26.x yet, so those cannot be booted with this harness.
   integration:
     runs-on: ubuntu-latest
     strategy:
@@ -101,11 +103,6 @@ jobs:
       matrix:
         paper: ['1.21.11']
         velocity: ['3.5.1', '4.1.1', '4.2.0', '4.3.0', '4.3.1']
-        include:
-          - paper: '1.21'
-            velocity: '4.3.1'
-          - paper: '26.3'
-            velocity: '4.3.1'
     services:
       mariadb:
         image: mariadb:11.4

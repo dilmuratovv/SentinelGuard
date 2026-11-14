@@ -139,7 +139,7 @@ There is a single JAR per platform: no need to pick one for your version.
 
 Paper has no 1.21.2 or exactly 26.1 server build. Paper versions before 1.21 (including 1.8 to 1.20), other forks and Folia are not supported.
 
-**How one JAR covers every version.** The Paper JAR is compiled against the oldest supported API (Paper 1.21) and the Velocity JAR against the oldest (Velocity 3.5.1). CI then checks, for every supported version, that each class, method and field the JAR uses exists there with the same signature (`tools/api_compat.py`), and boots the same JARs on real servers. A newer API version is added to the CI lists only after that check passes.
+**How one JAR covers every version.** The Paper JAR is compiled against the oldest supported API (Paper 1.21) and the Velocity JAR against the oldest (Velocity 3.5.1). CI then checks, for every supported version, that each class, method and field the JAR uses exists there with the same signature (`tools/api_compat.py`), and boots the same JARs on a real Paper server with every Velocity version. A newer API version is added to the CI lists only after that check passes.
 
 ## Build from source
 
