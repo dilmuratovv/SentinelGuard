@@ -18,7 +18,7 @@ class JdbcPunishmentStoreTest {
     }
     DataSource ds = new DriverManagerSource(url, System.getenv("SG_TEST_JDBC_USER"), System.getenv("SG_TEST_JDBC_PASSWORD"));
     try (var c = ds.getConnection(); var s = c.createStatement()) {
-      for (String table : new String[]{"sg_outbox", "sg_punishments", "sg_schema", "sg_players", "sg_player_ips", "sg_sus", "sg_sus_log"}) s.execute("DROP TABLE IF EXISTS " + table);
+      for (String table : new String[]{"sg_outbox", "sg_punishments", "sg_schema", "sg_players", "sg_player_ips", "sg_sus", "sg_sus_log", "sg_servers"}) s.execute("DROP TABLE IF EXISTS " + table);
     }
     return ds;
   }
@@ -39,6 +39,41 @@ class JdbcPunishmentStoreTest {
     assertTrue(reader.active(p.player(), T1).isEmpty());
     assertTrue(reader.active(UUID.randomUUID(), Instant.ofEpochMilli(1500)).isEmpty());
     assertEquals(1, outboxCount(ds));
+  }
+  @Test void serverScopeIsSharedAndUpdatable() throws Exception {
+    var ds = source(); var writer = store(ds); var reader = new JdbcPunishmentStore(ds);
+    assertTrue(reader.servers().isEmpty());
+    writer.registerServer(new ServerScope("lobby", false, false), T0);
+    writer.registerServer(new ServerScope("survival", true, true), T0);
+    writer.registerServer(new ServerScope("lobby", false, true), T1); // restart with changed config updates in place
+    var byId = new HashMap<String, ServerScope>();
+    for (var s : reader.servers()) byId.put(s.serverId(), s);
+    assertEquals(2, byId.size());
+    assertFalse(byId.get("lobby").enforceBans());
+    assertTrue(byId.get("lobby").enforceMutes());
+    assertTrue(byId.get("survival").enforces(NetworkPunishment.Type.BAN));
+    assertFalse(byId.get("lobby").enforces(NetworkPunishment.Type.IP_BAN));
+    assertTrue(byId.get("lobby").enforces(NetworkPunishment.Type.WARN));
+  }
+  @Test void silentRevocationSurvivesRoundTrip() throws Exception {
+    var ds = source(); var store = store(ds); UUID player = UUID.randomUUID();
+    var quiet = ban(player); store.create(quiet);
+    assertTrue(store.revoke(quiet.id(), new NetworkPunishment.Revocation("mod", "appeal", T0.plusMillis(10), true)));
+    assertTrue(store.find(quiet.id()).orElseThrow().revocation().silent());
+    var loud = of(NetworkPunishment.Type.MUTE, player, null, T0, null); store.create(loud);
+    store.revokeActive(player, null, Set.of(NetworkPunishment.Type.MUTE), by("mod"));
+    assertFalse(store.find(loud.id()).orElseThrow().revocation().silent());
+  }
+  @Test void upgradesV3DatabaseToV4() throws Exception {
+    var ds = source();
+    try (var c = ds.getConnection(); var q = c.createStatement()) {
+      q.execute("CREATE TABLE sg_schema (id INT PRIMARY KEY, version INT NOT NULL)");
+      q.execute("INSERT INTO sg_schema VALUES (1, 3)");
+      q.execute("CREATE TABLE sg_punishments (id VARCHAR(36) PRIMARY KEY, player_uuid VARCHAR(36) NULL, player_name VARCHAR(64) NULL, ip VARCHAR(64) NULL, kind VARCHAR(16) NOT NULL, reason VARCHAR(2048) NOT NULL, actor_uuid VARCHAR(36) NULL, actor VARCHAR(128) NOT NULL, server_id VARCHAR(128) NOT NULL, created_ms BIGINT NOT NULL, expires_ms BIGINT NULL, silent BOOLEAN NOT NULL DEFAULT FALSE, revoked BOOLEAN NOT NULL DEFAULT FALSE, revoked_by VARCHAR(128) NULL, revoke_reason VARCHAR(2048) NULL, revoked_ms BIGINT NULL)");
+    }
+    var store = store(ds); var p = ban(UUID.randomUUID()); store.create(p);
+    assertEquals(1, store.active(p.player(), Instant.ofEpochMilli(1500)).size());
+    try (var c = ds.getConnection(); var q = c.createStatement(); var rs = q.executeQuery("SELECT version FROM sg_schema WHERE id=1")) { rs.next(); assertEquals(4, rs.getInt(1)); }
   }
   @Test void outboxFailureRollsBackPunishment() throws Exception {
     var ds = source(); var store = store(ds);
@@ -129,7 +164,7 @@ class JdbcPunishmentStoreTest {
     var store = store(ds); store.initialize();
     assertEquals(1, store.recent(10).size());
     store.create(of(NetworkPunishment.Type.IP_BAN, null, "10.1.1.1", T0, null));
-    try (var c = ds.getConnection(); var s = c.createStatement(); var rs = s.executeQuery("SELECT version FROM sg_schema WHERE id=1")) { rs.next(); assertEquals(3, rs.getInt(1)); }
+    try (var c = ds.getConnection(); var s = c.createStatement(); var rs = s.executeQuery("SELECT version FROM sg_schema WHERE id=1")) { rs.next(); assertEquals(4, rs.getInt(1)); }
   }
   @Test void banStampedByAFastClockIsEnforcedImmediately() throws Exception {
     var ds = source(); var store = store(ds); UUID player = UUID.randomUUID();

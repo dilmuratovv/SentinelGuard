@@ -263,7 +263,7 @@ public class GUIListener implements Listener {
                     plugin.getPunishmentManager().createPunishment(PunishmentType.BAN,
                             entry.getPlayerUuid(), entry.getPlayerName(), ip, player, "Qoidabuzarlik", 24 * 60 * 60 * 1000L, false, rec -> {
                         plugin.getPunishmentFormatter().broadcastPunishment(rec);
-                        if (targetPlayer != null && targetPlayer.isOnline()) {
+                        if (targetPlayer != null && targetPlayer.isOnline() && plugin.getPunishmentManager().enforcesBans()) {
                             targetPlayer.kickPlayer(plugin.getPunishmentFormatter().buildBanScreen(rec));
                         }
                     });
@@ -273,7 +273,7 @@ public class GUIListener implements Listener {
                     plugin.getPunishmentManager().createPunishment(PunishmentType.BAN,
                             entry.getPlayerUuid(), entry.getPlayerName(), ip, player, "Shubhali faoliyat / Bag", 7 * 24 * 60 * 60 * 1000L, false, rec -> {
                         plugin.getPunishmentFormatter().broadcastPunishment(rec);
-                        if (targetPlayer != null && targetPlayer.isOnline()) {
+                        if (targetPlayer != null && targetPlayer.isOnline() && plugin.getPunishmentManager().enforcesBans()) {
                             targetPlayer.kickPlayer(plugin.getPunishmentFormatter().buildBanScreen(rec));
                         }
                     });
@@ -283,7 +283,7 @@ public class GUIListener implements Listener {
                     plugin.getPunishmentManager().createPunishment(PunishmentType.BAN,
                             entry.getPlayerUuid(), entry.getPlayerName(), ip, player, "Cheat / Noqonuniy dasturlar", 30L * 24 * 60 * 60 * 1000L, false, rec -> {
                         plugin.getPunishmentFormatter().broadcastPunishment(rec);
-                        if (targetPlayer != null && targetPlayer.isOnline()) {
+                        if (targetPlayer != null && targetPlayer.isOnline() && plugin.getPunishmentManager().enforcesBans()) {
                             targetPlayer.kickPlayer(plugin.getPunishmentFormatter().buildBanScreen(rec));
                         }
                     });
@@ -293,7 +293,7 @@ public class GUIListener implements Listener {
                     plugin.getPunishmentManager().createPunishment(PunishmentType.BAN,
                             entry.getPlayerUuid(), entry.getPlayerName(), ip, player, "Cheat / Serverga zarar yetkazish", -1, false, rec -> {
                         plugin.getPunishmentFormatter().broadcastPunishment(rec);
-                        if (targetPlayer != null && targetPlayer.isOnline()) {
+                        if (targetPlayer != null && targetPlayer.isOnline() && plugin.getPunishmentManager().enforcesBans()) {
                             targetPlayer.kickPlayer(plugin.getPunishmentFormatter().buildBanScreen(rec));
                         }
                     });

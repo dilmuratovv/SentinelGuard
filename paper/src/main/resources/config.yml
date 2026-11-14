@@ -1,6 +1,6 @@
 # ====================================================== #
 #           SentinelGuard Moderation & Ban Configuration         #
-#                      Version 2.0.0                     #
+#                      Version 2.1.0                     #
 # ====================================================== #
 
 prefix: "&8[&cSentinelGuard&8] "
@@ -380,8 +380,19 @@ network:
   history-limit: 500
   # Copy the old punishments.yml into the database on start. Safe to repeat; the file is never changed.
   import-legacy-on-start: true
-  # Also broadcast punishments issued on other servers.
-  broadcast-remote-punishments: false
+  # Which network punishments apply on THIS server (each Paper server sets its own).
+  # The choice is published to the shared database, so the Velocity proxy follows it too.
+  scope:
+    # true  = bans and IP bans given on any server apply here (banned players cannot join).
+    # false = this server ignores bans: banned players may play here (e.g. a lobby or appeal server).
+    #         The proxy lets them connect to this server only and blocks the others.
+    enforce-bans: true
+    # true  = mutes given on any server silence the player here.
+    # false = muted players may chat here.
+    enforce-mutes: true
+    # Tell this server's players when a ban/mute/unban/unmute happens on another server.
+    # Only kinds this server enforces are announced; silent (-s) actions reach staff only.
+    announce-remote: true
   staff-chat-format: "&8[&cStaffChat&8] &7[{server}] &b{staff}&8: &f{message}"
   redis:
     enabled: false

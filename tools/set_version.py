@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sets the project version everywhere it is declared: python3 tools/set_version.py 2.0.0"""
+"""Sets the project version everywhere it is declared: python3 tools/set_version.py 2.1.0"""
 import re
 import sys
 from pathlib import Path

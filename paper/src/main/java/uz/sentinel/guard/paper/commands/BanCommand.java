@@ -95,7 +95,7 @@ public class BanCommand implements CommandExecutor, TabCompleter {
         plugin.getPunishmentManager().createPunishment(
                 PunishmentType.BAN, targetUuid, targetName, ip, sender, reason, durationMs, silent, record -> {
             plugin.getPunishmentFormatter().broadcastPunishment(record);
-            if (targetOnline != null && targetOnline.isOnline()) {
+            if (targetOnline != null && targetOnline.isOnline() && plugin.getPunishmentManager().enforcesBans()) {
                 targetOnline.kickPlayer(plugin.getPunishmentFormatter().buildBanScreen(record));
             }
         });

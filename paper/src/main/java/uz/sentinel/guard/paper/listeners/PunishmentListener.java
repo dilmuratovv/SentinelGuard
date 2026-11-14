@@ -91,7 +91,7 @@ public class PunishmentListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onPaperChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
-        PunishmentRecord activeMute = plugin.getPunishmentManager().getActiveMute(player.getUniqueId());
+        PunishmentRecord activeMute = plugin.getPunishmentManager().getEnforcedMute(player.getUniqueId());
         if (activeMute != null) {
             event.setCancelled(true);
             List<String> messages = plugin.getPunishmentFormatter().buildMuteAttemptMessage(activeMute);
@@ -104,7 +104,7 @@ public class PunishmentListener implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onLegacyChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
-        PunishmentRecord activeMute = plugin.getPunishmentManager().getActiveMute(player.getUniqueId());
+        PunishmentRecord activeMute = plugin.getPunishmentManager().getEnforcedMute(player.getUniqueId());
         if (activeMute != null) {
             event.setCancelled(true);
             List<String> messages = plugin.getPunishmentFormatter().buildMuteAttemptMessage(activeMute);

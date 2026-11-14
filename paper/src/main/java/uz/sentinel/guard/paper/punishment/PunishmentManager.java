@@ -61,6 +61,27 @@ public class PunishmentManager {
         return network != null;
     }
 
+    /** False when this server is configured to ignore network bans (network.scope.enforce-bans: false). */
+    public boolean enforcesBans() {
+        NetworkService service = network;
+        return service == null || service.enforcesBans();
+    }
+
+    /** False when this server is configured to ignore network mutes (network.scope.enforce-mutes: false). */
+    public boolean enforcesMutes() {
+        NetworkService service = network;
+        return service == null || service.enforcesMutes();
+    }
+
+    /** Whether punishments of this type apply here; public announcements follow the same rule. */
+    public boolean enforces(PunishmentType type) {
+        return switch (type) {
+            case BAN, IP_BAN -> enforcesBans();
+            case MUTE -> enforcesMutes();
+            default -> true;
+        };
+    }
+
     public NetworkService getNetwork() {
         return network;
     }
@@ -184,18 +205,41 @@ public class PunishmentManager {
 
     /** Applies a committed row seen in the outbox (possibly from another server) and enforces it here. */
     public void applyRemote(NetworkPunishment row) {
-        boolean known = punishmentsByNetworkId.containsKey(row.id());
+        PunishmentRecord existing = punishmentsByNetworkId.get(row.id());
+        boolean known = existing != null;
+        boolean alreadyRevoked = known && existing.getUnpunisherName() != null;
         PunishmentRecord record = upsert(row, true);
-        if (known || record == null) return;
+        if (record == null) return;
+        if (known) {
+            // Revoked elsewhere (unban/unmute): tell this server, unless it did it itself or it was a replacement.
+            if (row.revoked() && !alreadyRevoked) announceRemoteRevocation(row, record);
+            return;
+        }
         if (record.getType() == PunishmentType.KICK) {
             kickIfOnline(record, row);
             return;
         }
         if (!record.isActive()) return;
-        if (plugin.getConfigManager().getConfig().getBoolean("network.broadcast-remote-punishments", false)
-                && !row.server().equals(network == null ? "" : network.serverId())) {
+        if (announcesRemote() && !row.server().equals(network == null ? "" : network.serverId())
+                && (row.type() == NetworkPunishment.Type.BAN || row.type() == NetworkPunishment.Type.IP_BAN
+                    || row.type() == NetworkPunishment.Type.MUTE || row.type() == NetworkPunishment.Type.WARN)) {
             plugin.getPunishmentFormatter().broadcastPunishment(record);
         }
+    }
+
+    /** network.scope.announce-remote: servers announce bans/mutes/unbans/unmutes issued on other servers. */
+    private boolean announcesRemote() {
+        return plugin.getConfigManager().getConfig().getBoolean("network.scope.announce-remote", true);
+    }
+
+    private void announceRemoteRevocation(NetworkPunishment row, PunishmentRecord record) {
+        NetworkPunishment.Revocation revocation = row.revocation();
+        if (!announcesRemote() || revocation == null || revocation.actor().equals("System")) return;
+        PunishmentType type = record.getType();
+        if (type != PunishmentType.BAN && type != PunishmentType.IP_BAN && type != PunishmentType.MUTE) return;
+        if (!enforces(type)) return; // a server that ignores this kind has nothing to announce
+        String name = type == PunishmentType.IP_BAN && record.getTargetIp() != null ? record.getTargetIp() : record.getTargetName();
+        plugin.getPunishmentFormatter().broadcastUnpunish(type, name, revocation.actor(), revocation.reason(), revocation.silent());
     }
 
     /** A kick issued on another server: carry it out here if the player is on this server and the kick is live. */
@@ -295,6 +339,7 @@ public class PunishmentManager {
     /** Kicks online players affected by a ban that arrived from the network. */
     private void enforce(PunishmentRecord record) {
         if (record.getType() != PunishmentType.BAN && record.getType() != PunishmentType.IP_BAN) return;
+        if (!enforcesBans()) return;
         String screen = plugin.getPunishmentFormatter().buildBanScreen(record);
         for (Player p : Bukkit.getOnlinePlayers()) {
             boolean account = p.getUniqueId().equals(record.getTargetUuid());
@@ -372,7 +417,7 @@ public class PunishmentManager {
             createPunishment(PunishmentType.BAN, targetUuid, targetName, targetIp, staff, reason, dur, false, rec -> {
                 plugin.getPunishmentFormatter().broadcastPunishment(rec);
                 Player targetPlayer = Bukkit.getPlayer(targetUuid);
-                if (targetPlayer != null) targetPlayer.kickPlayer(plugin.getPunishmentFormatter().buildBanScreen(rec));
+                if (targetPlayer != null && enforcesBans()) targetPlayer.kickPlayer(plugin.getPunishmentFormatter().buildBanScreen(rec));
             });
         } else if (actType.equals("kick")) {
             createPunishment(PunishmentType.KICK, targetUuid, targetName, targetIp, staff, reason, 0, false, rec -> {
@@ -394,7 +439,8 @@ public class PunishmentManager {
         if (service == null && networkUnavailable) throw new IllegalStateException("Network database unavailable");
         if (service == null) return getActiveBan(uuid, ip);
         Instant now = Instant.now();
-        List<NetworkPunishment> bans = service.store().activeBans(uuid, ip, now);
+        // A server that ignores network bans lets banned players in; it still loads their mute/freeze state below.
+        List<NetworkPunishment> bans = service.enforcesBans() ? service.store().activeBans(uuid, ip, now) : List.of();
         List<NetworkPunishment> active = service.store().active(uuid, now);
         // Freeze state must be known before PlayerJoinEvent, so it is written here (maps are thread-safe).
         boolean frozen = false;
@@ -408,6 +454,7 @@ public class PunishmentManager {
         if (!frozen) activeFreezeByPlayer.remove(uuid);
         List<NetworkPunishment> seen = new ArrayList<>(bans);
         seen.addAll(active);
+        if (!service.enforcesBans()) seen.removeIf(p -> p.type() == NetworkPunishment.Type.BAN || p.type() == NetworkPunishment.Type.IP_BAN);
         service.sync(() -> seen.forEach(p -> upsert(p, false))); // mute state ready before join
         return bans.isEmpty() ? null : PunishmentRecord.fromNetwork(bans.get(0));
     }
@@ -456,6 +503,11 @@ public class PunishmentManager {
         return null;
     }
 
+    /** The mute that blocks chat on this server: null when it is not enforced here. */
+    public PunishmentRecord getEnforcedMute(UUID targetUuid) {
+        return enforcesMutes() ? getActiveMute(targetUuid) : null;
+    }
+
     public List<PunishmentRecord> getActiveMutes(UUID targetUuid) {
         List<PunishmentRecord> list = new ArrayList<>(1);
         PunishmentRecord mute = getActiveMute(targetUuid);
@@ -482,8 +534,13 @@ public class PunishmentManager {
 
     private void revokeNetwork(UUID player, String ip, Set<NetworkPunishment.Type> types, String unpunisher, String reason,
                                CommandSender sender, Consumer<Integer> onCommitted) {
+        revokeNetwork(player, ip, types, unpunisher, reason, false, sender, onCommitted);
+    }
+
+    private void revokeNetwork(UUID player, String ip, Set<NetworkPunishment.Type> types, String unpunisher, String reason, boolean silent,
+                               CommandSender sender, Consumer<Integer> onCommitted) {
         NetworkService service = network;
-        NetworkPunishment.Revocation revocation = new NetworkPunishment.Revocation(limit(unpunisher, 128), limit(reason, 2048), Instant.now());
+        NetworkPunishment.Revocation revocation = new NetworkPunishment.Revocation(limit(unpunisher, 128), limit(reason, 2048), Instant.now(), silent);
         service.submit(store -> store.revokeActive(player, ip, types, revocation), ids -> {
             markRevoked(ids, revocation.actor(), revocation.reason());
             if (!ids.isEmpty()) service.publishChange();
@@ -497,11 +554,16 @@ public class PunishmentManager {
     }
 
     public void unban(UUID targetUuid, CommandSender sender, String reason, Consumer<Boolean> onCommitted) {
+        unban(targetUuid, sender, reason, false, onCommitted);
+    }
+
+    /** {@code silent}: other servers announce this unban to staff only. */
+    public void unban(UUID targetUuid, CommandSender sender, String reason, boolean silent, Consumer<Boolean> onCommitted) {
         String unpunisher = sender != null ? sender.getName() : "Console";
         if (isNetworkUnavailable()) { fail(sender); return; }
         if (network != null) {
             if (targetUuid == null) { onCommitted.accept(false); return; }
-            revokeNetwork(targetUuid, null, EnumSet.of(NetworkPunishment.Type.BAN, NetworkPunishment.Type.IP_BAN), unpunisher, reason, sender, n -> onCommitted.accept(n > 0));
+            revokeNetwork(targetUuid, null, EnumSet.of(NetworkPunishment.Type.BAN, NetworkPunishment.Type.IP_BAN), unpunisher, reason, silent, sender, n -> onCommitted.accept(n > 0));
             return;
         }
         onCommitted.accept(unbanLocal(targetUuid, unpunisher, reason));
@@ -525,12 +587,16 @@ public class PunishmentManager {
     }
 
     public void unbanIp(String ip, CommandSender sender, String reason, Consumer<Boolean> onCommitted) {
+        unbanIp(ip, sender, reason, false, onCommitted);
+    }
+
+    public void unbanIp(String ip, CommandSender sender, String reason, boolean silent, Consumer<Boolean> onCommitted) {
         String unpunisher = sender != null ? sender.getName() : "Console";
         String cleanIp = IpAddresses.normalize(ip);
         if (cleanIp == null) { onCommitted.accept(false); return; }
         if (isNetworkUnavailable()) { fail(sender); return; }
         if (network != null) {
-            revokeNetwork(null, cleanIp, EnumSet.of(NetworkPunishment.Type.IP_BAN), unpunisher, reason, sender, n -> onCommitted.accept(n > 0));
+            revokeNetwork(null, cleanIp, EnumSet.of(NetworkPunishment.Type.IP_BAN), unpunisher, reason, silent, sender, n -> onCommitted.accept(n > 0));
             return;
         }
         onCommitted.accept(unbanIpLocal(cleanIp, unpunisher, reason));
@@ -552,11 +618,15 @@ public class PunishmentManager {
     }
 
     public void unmute(UUID targetUuid, CommandSender sender, String reason, Consumer<Boolean> onCommitted) {
+        unmute(targetUuid, sender, reason, false, onCommitted);
+    }
+
+    public void unmute(UUID targetUuid, CommandSender sender, String reason, boolean silent, Consumer<Boolean> onCommitted) {
         String unpunisher = sender != null ? sender.getName() : "Console";
         if (isNetworkUnavailable()) { fail(sender); return; }
         if (network != null) {
             if (targetUuid == null) { onCommitted.accept(false); return; }
-            revokeNetwork(targetUuid, null, EnumSet.of(NetworkPunishment.Type.MUTE), unpunisher, reason, sender, n -> onCommitted.accept(n > 0));
+            revokeNetwork(targetUuid, null, EnumSet.of(NetworkPunishment.Type.MUTE), unpunisher, reason, silent, sender, n -> onCommitted.accept(n > 0));
             return;
         }
         onCommitted.accept(unmuteLocal(targetUuid, unpunisher, reason));

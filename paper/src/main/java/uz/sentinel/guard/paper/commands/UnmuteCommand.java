@@ -56,7 +56,7 @@ public class UnmuteCommand implements CommandExecutor, TabCompleter {
         String finalName = targetName;
         UUID finalTarget = targetUuid;
         boolean finalSilent = silent;
-        plugin.getPunishmentManager().unmute(targetUuid, sender, reason, success -> {
+        plugin.getPunishmentManager().unmute(targetUuid, sender, reason, finalSilent, success -> {
             if (success) {
                 plugin.getPunishmentFormatter().broadcastUnpunish(PunishmentType.MUTE, finalName, sender.getName(), reason, finalSilent);
                 Player targetOnline = (finalTarget != null) ? Bukkit.getPlayer(finalTarget) : null;

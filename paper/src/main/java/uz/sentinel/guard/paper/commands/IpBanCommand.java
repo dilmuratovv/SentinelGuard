@@ -105,7 +105,7 @@ public class IpBanCommand implements CommandExecutor, TabCompleter {
             plugin.getPunishmentFormatter().broadcastPunishment(record);
             // Kick all online players with this IP and the targeted account
             String kickScreen = plugin.getPunishmentFormatter().buildBanScreen(record);
-            for (Player p : Bukkit.getOnlinePlayers()) {
+            for (Player p : plugin.getPunishmentManager().enforcesBans() ? Bukkit.getOnlinePlayers() : List.<Player>of()) {
                 if (p.getUniqueId().equals(finalTarget) || (record.getTargetIp() != null && record.getTargetIp().equals(DataFiles.ip(p)))) {
                     p.kickPlayer(kickScreen);
                 }

@@ -8,8 +8,8 @@ import java.util.*;
  * Blocking API: adapters must invoke it on their bounded database executor, never on a server thread.
  */
 public final class JdbcPunishmentStore {
-    public static final int SCHEMA_VERSION = 3;
-    private static final String COLUMNS = "id,player_uuid,player_name,ip,kind,reason,actor_uuid,actor,server_id,created_ms,expires_ms,silent,revoked,revoked_by,revoke_reason,revoked_ms";
+    public static final int SCHEMA_VERSION = 4;
+    private static final String COLUMNS = "id,player_uuid,player_name,ip,kind,reason,actor_uuid,actor,server_id,created_ms,expires_ms,silent,revoked,revoked_by,revoke_reason,revoked_ms,revoke_silent";
     private static final String ACTIVE = "revoked=FALSE AND kind<>'KICK' AND (expires_ms IS NULL OR expires_ms>?)";
     private static final String[][] PUNISHMENT_COLUMNS = {
         {"player_name","VARCHAR(64) NULL"}, {"ip","VARCHAR(64) NULL"}, {"actor_uuid","VARCHAR(36) NULL"},
@@ -22,16 +22,21 @@ public final class JdbcPunishmentStore {
     public void initialize() throws SQLException {
         try (Connection c = source.getConnection(); Statement s = c.createStatement()) {
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_schema (id INT PRIMARY KEY, version INT NOT NULL) ENGINE=InnoDB");
-            s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_punishments (id VARCHAR(36) PRIMARY KEY, player_uuid VARCHAR(36) NULL, player_name VARCHAR(64) NULL, ip VARCHAR(64) NULL, kind VARCHAR(16) NOT NULL, reason VARCHAR(2048) NOT NULL, actor_uuid VARCHAR(36) NULL, actor VARCHAR(128) NOT NULL, server_id VARCHAR(128) NOT NULL, created_ms BIGINT NOT NULL, expires_ms BIGINT NULL, silent BOOLEAN NOT NULL DEFAULT FALSE, revoked BOOLEAN NOT NULL DEFAULT FALSE, revoked_by VARCHAR(128) NULL, revoke_reason VARCHAR(2048) NULL, revoked_ms BIGINT NULL, INDEX sg_player_active (player_uuid, kind, revoked)) ENGINE=InnoDB");
+            s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_punishments (id VARCHAR(36) PRIMARY KEY, player_uuid VARCHAR(36) NULL, player_name VARCHAR(64) NULL, ip VARCHAR(64) NULL, kind VARCHAR(16) NOT NULL, reason VARCHAR(2048) NOT NULL, actor_uuid VARCHAR(36) NULL, actor VARCHAR(128) NOT NULL, server_id VARCHAR(128) NOT NULL, created_ms BIGINT NOT NULL, expires_ms BIGINT NULL, silent BOOLEAN NOT NULL DEFAULT FALSE, revoked BOOLEAN NOT NULL DEFAULT FALSE, revoked_by VARCHAR(128) NULL, revoke_reason VARCHAR(2048) NULL, revoked_ms BIGINT NULL, revoke_silent BOOLEAN NOT NULL DEFAULT FALSE, INDEX sg_player_active (player_uuid, kind, revoked)) ENGINE=InnoDB");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_outbox (sequence_id BIGINT AUTO_INCREMENT PRIMARY KEY, event_id VARCHAR(36) NOT NULL UNIQUE, punishment_id VARCHAR(36) NULL, player_uuid VARCHAR(36) NULL, ip VARCHAR(64) NULL, action VARCHAR(16) NOT NULL, created_ms BIGINT NOT NULL) ENGINE=InnoDB");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_players (player_uuid VARCHAR(36) PRIMARY KEY, name VARCHAR(64) NOT NULL, name_lower VARCHAR(64) NOT NULL, latest_ip VARCHAR(64) NULL, updated_ms BIGINT NOT NULL, INDEX sg_player_name (name_lower)) ENGINE=InnoDB");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_player_ips (player_uuid VARCHAR(36) NOT NULL, ip VARCHAR(64) NOT NULL, first_ms BIGINT NOT NULL, PRIMARY KEY (player_uuid, ip), INDEX sg_ip_players (ip)) ENGINE=InnoDB");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_sus (player_uuid VARCHAR(36) PRIMARY KEY, name VARCHAR(64) NOT NULL, is_active BOOLEAN NOT NULL, first_ms BIGINT NOT NULL, last_ms BIGINT NOT NULL) ENGINE=InnoDB");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_sus_log (id BIGINT AUTO_INCREMENT PRIMARY KEY, player_uuid VARCHAR(36) NOT NULL, reason VARCHAR(512) NOT NULL, staff VARCHAR(128) NOT NULL, ts_ms BIGINT NOT NULL, INDEX sg_sus_log_player (player_uuid)) ENGINE=InnoDB");
+            s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_servers (server_id VARCHAR(128) PRIMARY KEY, enforce_bans BOOLEAN NOT NULL, enforce_mutes BOOLEAN NOT NULL, updated_ms BIGINT NOT NULL) ENGINE=InnoDB");
             int version = schemaVersion(c);
             if (version > SCHEMA_VERSION) throw new SQLException("Database schema " + version + " is newer than this plugin supports (" + SCHEMA_VERSION + ")");
             if (version < 2) migrateToV2(c);
             if (version < 3) setVersion(c, 3); // v3 only adds the tables created above
+            if (version < 4) { // v4: per-server scope table (created above) and silent revocations
+                addMissing(c, "sg_punishments", new String[][]{{"revoke_silent", "BOOLEAN NOT NULL DEFAULT FALSE"}});
+                setVersion(c, 4);
+            }
         }
     }
     private int schemaVersion(Connection c) throws SQLException {
@@ -115,9 +120,9 @@ public final class JdbcPunishmentStore {
     /** Revokes one punishment by id; false if it was not active. */
     public boolean revoke(UUID id, NetworkPunishment.Revocation revocation) throws SQLException {
         return transaction(c -> {
-            try (PreparedStatement s = c.prepareStatement("UPDATE sg_punishments SET revoked=TRUE, revoked_by=?, revoke_reason=?, revoked_ms=? WHERE id=? AND " + ACTIVE)) {
+            try (PreparedStatement s = c.prepareStatement("UPDATE sg_punishments SET revoked=TRUE, revoked_by=?, revoke_reason=?, revoked_ms=?, revoke_silent=? WHERE id=? AND " + ACTIVE)) {
                 s.setString(1, revocation.actor()); s.setString(2, revocation.reason()); s.setLong(3, revocation.at().toEpochMilli());
-                s.setString(4, id.toString()); s.setLong(5, revocation.at().toEpochMilli());
+                s.setBoolean(4, revocation.silent()); s.setString(5, id.toString()); s.setLong(6, revocation.at().toEpochMilli());
                 if (s.executeUpdate() == 0) return false;
             }
             NetworkPunishment p = find(c, id).orElseThrow();
@@ -146,10 +151,10 @@ public final class JdbcPunishmentStore {
         // IP matches only apply to IP bans; a plain ban on another account sharing the IP stays.
         rows.removeIf(p -> !Objects.equals(p.player(), player) && p.type() != NetworkPunishment.Type.IP_BAN);
         List<UUID> ids = new ArrayList<>(rows.size());
-        try (PreparedStatement s = c.prepareStatement("UPDATE sg_punishments SET revoked=TRUE, revoked_by=?, revoke_reason=?, revoked_ms=? WHERE id=?")) {
+        try (PreparedStatement s = c.prepareStatement("UPDATE sg_punishments SET revoked=TRUE, revoked_by=?, revoke_reason=?, revoked_ms=?, revoke_silent=? WHERE id=?")) {
             for (NetworkPunishment p : rows) {
                 s.setString(1, revocation.actor()); s.setString(2, revocation.reason()); s.setLong(3, revocation.at().toEpochMilli());
-                s.setString(4, p.id().toString()); s.executeUpdate();
+                s.setBoolean(4, revocation.silent()); s.setString(5, p.id().toString()); s.executeUpdate();
                 outbox(c, p.id(), p.player(), p.ip(), OutboxEvent.Action.REVOKED, revocation.at());
                 ids.add(p.id());
             }
@@ -157,7 +162,7 @@ public final class JdbcPunishmentStore {
         return List.copyOf(ids);
     }
     private static void insert(Connection c, NetworkPunishment p) throws SQLException {
-        try (PreparedStatement s = c.prepareStatement("INSERT INTO sg_punishments (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
+        try (PreparedStatement s = c.prepareStatement("INSERT INTO sg_punishments (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
             s.setString(1, p.id().toString()); setNullable(s, 2, p.player()); s.setString(3, p.playerName()); s.setString(4, p.ip());
             s.setString(5, p.type().name()); s.setString(6, p.reason()); setNullable(s, 7, p.actorId()); s.setString(8, p.actor());
             s.setString(9, p.server()); s.setLong(10, p.createdAt().toEpochMilli());
@@ -166,6 +171,7 @@ public final class JdbcPunishmentStore {
             NetworkPunishment.Revocation r = p.revocation();
             s.setString(14, r == null ? null : r.actor()); s.setString(15, r == null ? null : r.reason());
             if (r == null) s.setNull(16, Types.BIGINT); else s.setLong(16, r.at().toEpochMilli());
+            s.setBoolean(17, r != null && r.silent());
             s.executeUpdate();
         }
     }
@@ -272,9 +278,10 @@ public final class JdbcPunishmentStore {
         NetworkPunishment.Revocation revocation = null;
         if (rs.getBoolean("revoked")) {
             long at = rs.getLong("revoked_ms");
+            boolean noRevokedAt = rs.wasNull();
             String by = rs.getString("revoked_by"), why = rs.getString("revoke_reason");
             revocation = new NetworkPunishment.Revocation(by == null ? "Unknown" : by, why == null ? "Revoked" : why,
-                rs.wasNull() ? Instant.ofEpochMilli(rs.getLong("created_ms")) : Instant.ofEpochMilli(at));
+                noRevokedAt ? Instant.ofEpochMilli(rs.getLong("created_ms")) : Instant.ofEpochMilli(at), rs.getBoolean("revoke_silent"));
         }
         String player = rs.getString("player_uuid"), actorId = rs.getString("actor_uuid");
         return new NetworkPunishment(UUID.fromString(rs.getString("id")), player == null ? null : UUID.fromString(player),
@@ -534,6 +541,33 @@ public final class JdbcPunishmentStore {
                         Instant.ofEpochMilli(rs.getLong(5)), logs.getOrDefault(id, List.of())));
                 }
             }
+        }
+        return List.copyOf(result);
+    }
+
+    // ---- per-server punishment scope ----
+
+    /** Publishes which punishments a server enforces; every server and the proxy read this table. */
+    public void registerServer(ServerScope scope, Instant now) throws SQLException {
+        transaction(c -> {
+            try (PreparedStatement s = c.prepareStatement("UPDATE sg_servers SET enforce_bans=?, enforce_mutes=?, updated_ms=? WHERE server_id=?")) {
+                s.setBoolean(1, scope.enforceBans()); s.setBoolean(2, scope.enforceMutes()); s.setLong(3, now.toEpochMilli()); s.setString(4, scope.serverId());
+                if (s.executeUpdate() > 0) return null;
+            }
+            try (PreparedStatement s = c.prepareStatement("INSERT INTO sg_servers (server_id,enforce_bans,enforce_mutes,updated_ms) VALUES (?,?,?,?)")) {
+                s.setString(1, scope.serverId()); s.setBoolean(2, scope.enforceBans()); s.setBoolean(3, scope.enforceMutes()); s.setLong(4, now.toEpochMilli());
+                s.executeUpdate();
+            } catch (SQLException e) {
+                if (!isDuplicate(e)) throw e; // another start of the same server won the race; its values are equivalent
+            }
+            return null;
+        });
+    }
+    public List<ServerScope> servers() throws SQLException {
+        List<ServerScope> result = new ArrayList<>();
+        try (Connection c = source.getConnection(); Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT server_id,enforce_bans,enforce_mutes FROM sg_servers")) {
+            while (rs.next()) result.add(new ServerScope(rs.getString(1), rs.getBoolean(2), rs.getBoolean(3)));
         }
         return List.copyOf(result);
     }

@@ -1,4 +1,13 @@
-SentinelGuard 2.0 for Paper: 15 separate JARs, one per Paper version (1.21 – 1.21.11, 26.1.1 – 26.3).
+SentinelGuard 2.1 for Paper: per-server scope and network announcements.
+
+- **One JAR for every Paper version.** `SentinelGuard-2.1.0-paper.jar` runs on Paper 1.21 through 26.3 (previously 15 separate JARs). CI checks it against every supported API.
+
+- **Server scope.** `network.scope.enforce-bans` and `enforce-mutes` decide whether bans and mutes from other servers apply on this server. A lobby can let banned players in while the rest of the network stays protected.
+- **Network announcements.** Ban, IP ban, mute, warn, unban and unmute issued on one server are announced on every server that enforces them (`network.scope.announce-remote`, on by default). Silent (`-s`) unbans stay staff-only everywhere. This replaces `network.broadcast-remote-punishments`.
+- **Fix.** The time of a revocation no longer depends on the last nullable column read.
+- **Upgrade.** The shared database moves to schema 4 on first start; upgrade every Paper server and the proxy together.
+
+## Also in 2.0 (shared database)
 
 The Velocity plugin is a separate release (`velocity-v*`). Network mode needs both plus one MariaDB database.
 
@@ -27,4 +36,4 @@ The Velocity plugin is a separate release (`velocity-v*`). Network mode needs bo
   - A null address no longer crashes the GUI kick.
 - **Optional SentinelAC.** SentinelAC is still optional and is detected automatically.
 
-Pick the Paper JAR that matches your server version exactly. Checksums are in `SHA256SUMS.txt`.
+Checksums are in `SHA256SUMS.txt`.

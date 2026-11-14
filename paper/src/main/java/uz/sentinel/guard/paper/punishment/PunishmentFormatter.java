@@ -19,6 +19,8 @@ public class PunishmentFormatter {
      */
     public void broadcastPunishment(PunishmentRecord record) {
         ConfigManager config = plugin.getConfigManager();
+        // A server that does not enforce this kind (network.scope) only tells its staff, not every player.
+        boolean everyone = plugin.getPunishmentManager().enforces(record.getType());
         String typeKey = record.getType().name().toLowerCase();
         String durationStr = record.isPermanent() ? 
                 config.getConfig().getString("punishment-formats.permanent-text", "Abadiy") : 
@@ -43,11 +45,11 @@ public class PunishmentFormatter {
 
         if (broadcastLines.isEmpty()) {
             String fallback = config.getPrefix() + config.colorize("&e" + record.getTargetName() + " &cjazolandi (&e" + record.getType().getColoredName() + "&c)! Sabab: &f" + record.getReason());
-            Bukkit.broadcastMessage(applyPlaceholders(fallback, record, durationStr, expireStr));
+            announce(everyone, applyPlaceholders(fallback, record, durationStr, expireStr));
         } else {
             for (String line : broadcastLines) {
                 String colored = config.colorize(line);
-                Bukkit.broadcastMessage(applyPlaceholders(colored, record, durationStr, expireStr));
+                announce(everyone, applyPlaceholders(colored, record, durationStr, expireStr));
             }
         }
     }
@@ -57,6 +59,7 @@ public class PunishmentFormatter {
      */
     public void broadcastUnpunish(PunishmentType type, String targetName, String staffName, String reason, boolean silent) {
         ConfigManager config = plugin.getConfigManager();
+        boolean everyone = plugin.getPunishmentManager().enforces(type);
         String typeKey = "un" + type.name().toLowerCase();
         if (type == PunishmentType.IP_BAN) {
             typeKey = "unipban";
@@ -81,7 +84,7 @@ public class PunishmentFormatter {
 
         if (broadcastLines.isEmpty()) {
             String fallback = config.getPrefix() + config.colorize("&e" + targetName + "&ning &a" + type.getDefaultName() + "&a jazosi &b" + staffName + " &atomonidan bekor qilindi!");
-            Bukkit.broadcastMessage(fallback);
+            announce(everyone, fallback);
         } else {
             for (String line : broadcastLines) {
                 String colored = config.colorize(line)
@@ -90,7 +93,7 @@ public class PunishmentFormatter {
                         .replace("{target}", targetName)
                         .replace("{type}", type.getDefaultName())
                         .replace("{reason}", reason);
-                Bukkit.broadcastMessage(colored);
+                announce(everyone, colored);
             }
         }
     }
@@ -176,6 +179,16 @@ public class PunishmentFormatter {
                 .replace("{date}", TimeParser.formatDate(record.getStartTime()))
                 .replace("{time_ago}", TimeParser.formatTimeAgo(record.getStartTime()))
                 .replace("{id}", record.getId());
+    }
+
+    /** Everyone on the server, or only staff and console when this server does not enforce the punishment. */
+    private void announce(boolean everyone, String message) {
+        if (everyone) {
+            Bukkit.broadcastMessage(message);
+        } else {
+            broadcastToStaff(message);
+            Bukkit.getConsoleSender().sendMessage(message);
+        }
     }
 
     public void broadcastToStaff(String message) {

@@ -18,7 +18,9 @@ public record NetworkPunishment(UUID id, UUID player, String playerName, String 
             };
         }
     }
-    public record Revocation(String actor, String reason, Instant at) {
+    /** {@code silent}: the revoking staff member asked for a staff-only announcement (-s). */
+    public record Revocation(String actor, String reason, Instant at, boolean silent) {
+        public Revocation(String actor, String reason, Instant at) { this(actor, reason, at, false); }
         public Revocation {
             if (actor == null || actor.isBlank() || actor.length() > 128) throw new IllegalArgumentException("Invalid revoking actor");
             if (reason == null || reason.isBlank() || reason.length() > 2048) throw new IllegalArgumentException("Invalid revoke reason");

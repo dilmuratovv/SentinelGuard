@@ -21,7 +21,7 @@ A Minecraft moderation project by **azicoo** for Paper servers and Velocity netw
 
 SentinelGuard works on a single Paper server out of the box. When you run several servers behind Velocity, it switches to **network mode**: everything is stored in one MariaDB database, so a ban given on one server applies on all of them and at the proxy.
 
-**Every Paper and Velocity version has its own JAR**, published as two separate releases: one for Paper and one for Velocity.
+**One JAR for Paper and one for Velocity**, published as two separate releases. The Paper JAR runs on every supported Paper version (1.21 to 26.3) and the Velocity JAR on every supported Velocity version (3.5.1 to 4.3.1).
 
 [SentinelAC](https://github.com/dilmuratovv/SentinelAC) is **optional**. If it is installed, SentinelGuard detects it and adds players to `/sus` after repeated flags. It never changes SentinelAC enforcement, and every moderation feature works without it.
 
@@ -45,7 +45,7 @@ SentinelGuard works on a single Paper server out of the box. When you run severa
 
 ### Single server
 
-1. Download the Paper JAR that matches your server version from [Releases](https://github.com/dilmuratovv/SentinelGuard/releases).
+1. Download the Paper JAR from [Releases](https://github.com/dilmuratovv/SentinelGuard/releases).
 2. Put it in `plugins/` and restart.
 
 Data is stored in `punishments.yml`, `sus_data.yml` and `ip_history.yml` inside `plugins/SentinelGuard/`. Saves are asynchronous and atomic.
@@ -67,6 +67,24 @@ In network mode one MariaDB database holds everything, so an action on one serve
 - If the database is unreachable, logins are denied instead of letting banned players in (`network.deny-login-on-database-error`, on by default). Paper reconnects every 30 seconds.
 - A command reports success only after the change is saved.
 - A banned player who is already online is disconnected by the proxy within about a second.
+
+### Per-server scope (new in 2.1)
+
+By default a ban or mute applies on every server. Set the scope on each Paper server to exclude it, for example a lobby or an appeal server where banned players are still allowed:
+
+```yaml
+network:
+  scope:
+    enforce-bans: false    # banned players may join and play on this server
+    enforce-mutes: true    # mutes still silence players here
+    announce-remote: true  # tell this server's players about bans/mutes/unbans/unmutes from other servers
+```
+
+- Every server publishes its scope to the shared database when it starts, so the Velocity proxy follows it without extra setup. If a Velocity server name differs from the Paper `network.server-id`, map it in `database.properties`: `server.<velocity-name>=<paper-server-id>`.
+- With at least one ban-exempt server, a banned player can still connect to the proxy but only to ban-exempt servers. On login they are sent to one; a ban that lands while they are on another server moves them there instead of disconnecting. Without such a server, a ban stays a full network ban.
+- Announcements follow the scope: a ban or unban is shown only on servers that enforce bans, a mute or unmute only on servers that enforce mutes. A server that does not enforce a kind shows it to its staff and console only. Silent (`-s`) actions, including silent unbans, reach staff only on every server.
+- A server missing from the database (not started yet, or running 2.0) enforces everything, so a ban is never skipped by mistake.
+- Restart the Paper server after changing `network.scope`. All servers and the proxy must run 2.1 (the shared database moves to schema 4, which 2.0 refuses to open).
 
 ### Redis (optional)
 
@@ -112,40 +130,40 @@ Put the password in the URI and keep Redis off public networks.
 
 ## Compatibility
 
-Pick the JAR built for your exact server version.
+There is a single JAR per platform: no need to pick one for your version.
 
-**Paper** — file `SentinelGuard-<version>-paper<MC>.jar`
+| Platform | File | Supported versions | Java |
+|---|---|---|---|
+| **Paper** | `SentinelGuard-<version>-paper.jar` | 1.21, 1.21.1, 1.21.3 – 1.21.11, 26.1.1, 26.1.2, 26.2, 26.3 | 21 on 1.21.x, 25 on 26.x (what the server itself needs) |
+| **Velocity** | `SentinelGuard-<version>-velocity.jar` | 3.5.1, 4.1.1, 4.2.0, 4.3.0, 4.3.1 | 17 or newer (4.x needs 25 itself) |
 
-| Paper version | Java |
-|---|---|
-| 1.21, 1.21.1, 1.21.3 – 1.21.11 | 21 |
-| 26.1.1, 26.1.2, 26.2, 26.3 | 25 |
+Paper has no 1.21.2 or exactly 26.1 server build. Paper versions before 1.21 (including 1.8 to 1.20), other forks and Folia are not supported.
 
-**Velocity** — file `SentinelGuard-<version>-velocity<VERSION>.jar`
-
-| Velocity version | Java |
-|---|---|
-| 3.5.1 | 21 |
-| 4.1.1, 4.2.0, 4.3.0, 4.3.1 | 25 |
-
-Paper has no 1.21.2 or exactly 26.1 server build. Other versions and Folia are not supported.
+**How one JAR covers every version.** The Paper JAR is compiled against the oldest supported API (Paper 1.21) and the Velocity JAR against the oldest (Velocity 3.5.1). CI then checks, for every supported version, that each class, method and field the JAR uses exists there with the same signature (`tools/api_compat.py`), and boots the same JARs on real servers. A newer API version is added to the CI lists only after that check passes.
 
 ## Build from source
 
-You need **Maven 3.9+**, **Python 3** and **JDK 21** (Paper 1.21.x, Velocity 3.x) or **JDK 25** (Paper 26.x, Velocity 4.x).
+You need **Maven 3.9+**, **Python 3** and **JDK 21 or newer** (JDK 25 recommended, it can also run the compatibility check against Paper 26.x and Velocity 4.x).
 
 ```sh
 git clone https://github.com/dilmuratovv/SentinelGuard.git
 cd SentinelGuard
-mvn -B -pl paper -am -Ppaper-1.21.11 verify      # Paper target
-mvn -B -pl velocity -am -Pvelocity-4.3.1 verify  # Velocity target
+mvn -B verify
 ```
 
-The JARs appear in `paper/target/` and `velocity/target/`. Replace the profile with the version you need.
+The JARs appear in `paper/target/SentinelGuard-<version>-paper.jar` and `velocity/target/SentinelGuard-<version>-velocity.jar`.
+
+To check a JAR against another API version (needs JDK 25 for Paper 26.x / Velocity 4.x):
+
+```sh
+mvn -B -pl common install -DskipTests
+mvn -B -q -pl paper -Ppaper-26.3 org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.outputFile=classpath.txt
+python3 tools/api_compat.py --jar paper/target/SentinelGuard-*-paper.jar --classpath "$(cat classpath.txt)"
+```
 
 ## Releases
 
-Paper and Velocity are published as two separate releases. Each contains one JAR per supported version and a `SHA256SUMS.txt`.
+Paper and Velocity are published as two separate releases (tags `paper-vX.Y.Z` and `velocity-vX.Y.Z`). Each contains one JAR and a `SHA256SUMS.txt`.
 
 ## Credits & license
 

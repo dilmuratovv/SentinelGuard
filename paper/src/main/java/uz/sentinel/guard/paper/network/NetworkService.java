@@ -10,6 +10,7 @@ import uz.sentinel.guard.network.NetworkPlayer;
 import uz.sentinel.guard.network.NetworkPunishment;
 import uz.sentinel.guard.network.NetworkSus;
 import uz.sentinel.guard.network.OutboxEvent;
+import uz.sentinel.guard.network.ServerScope;
 import uz.sentinel.guard.paper.GuardPlugin;
 
 import java.time.Duration;
@@ -38,6 +39,7 @@ public final class NetworkService implements AutoCloseable {
 
     private final GuardPlugin plugin;
     private final String serverId;
+    private final ServerScope scope;
     private final HikariDataSource pool;
     private final JdbcPunishmentStore store;
     private final ThreadPoolExecutor executor;
@@ -51,6 +53,7 @@ public final class NetworkService implements AutoCloseable {
         this.plugin = plugin;
         this.serverId = section.getString("server-id", "server");
         if (serverId.isBlank() || serverId.length() > 128) throw new IllegalArgumentException("network.server-id must be 1-128 characters");
+        this.scope = new ServerScope(serverId, section.getBoolean("scope.enforce-bans", true), section.getBoolean("scope.enforce-mutes", true));
         ConfigurationSection db = section.getConfigurationSection("database");
         if (db == null) throw new IllegalArgumentException("network.database section missing");
         HikariConfig config = new HikariConfig();
@@ -75,6 +78,7 @@ public final class NetworkService implements AutoCloseable {
         try {
             JdbcPunishmentStore ready = new JdbcPunishmentStore(created);
             ready.initialize();
+            ready.registerServer(scope, Instant.now()); // proxy and other servers learn what this server enforces
             this.store = ready;
             this.pool = created;
             this.lastSequence = ready.latestSequence();
@@ -111,6 +115,12 @@ public final class NetworkService implements AutoCloseable {
     }
 
     public String serverId() { return serverId; }
+    /** Whether bans (account and IP) given anywhere apply on this server. */
+    public boolean enforcesBans() { return scope.enforceBans(); }
+    /** Whether mutes given anywhere apply on this server. */
+    public boolean enforcesMutes() { return scope.enforceMutes(); }
+    /** Whether punishments of this type are enforced, and therefore announced, here. */
+    public boolean enforces(NetworkPunishment.Type type) { return scope.enforces(type); }
     public JdbcPunishmentStore store() { return store; }
     public long lastSequence() { return lastSequence; }
     public boolean redisConnected() { return redis != null && redis.connected(); }

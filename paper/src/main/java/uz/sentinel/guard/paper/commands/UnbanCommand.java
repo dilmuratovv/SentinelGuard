@@ -55,7 +55,7 @@ public class UnbanCommand implements CommandExecutor, TabCompleter {
 
         String finalName = targetName;
         boolean finalSilent = silent;
-        plugin.getPunishmentManager().unban(targetUuid, sender, reason, success -> {
+        plugin.getPunishmentManager().unban(targetUuid, sender, reason, finalSilent, success -> {
             if (success) {
                 plugin.getPunishmentFormatter().broadcastUnpunish(PunishmentType.BAN, finalName, sender.getName(), reason, finalSilent);
             } else {

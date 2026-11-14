@@ -5,12 +5,14 @@ import com.velocitypowered.api.event.EventTask;
 import com.velocitypowered.api.event.ResultedEvent.ComponentResult;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.LoginEvent;
+import com.velocitypowered.api.event.player.ServerPreConnectEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
 import com.velocitypowered.api.scheduler.ScheduledTask;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -24,6 +26,7 @@ import java.nio.file.Path;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -31,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * IP), disconnects players as soon as a ban commits (outbox), and periodically re-checks everyone online.
  * Moderation commands run on the Paper servers; the proxy only enforces.
  */
-@Plugin(id="sentinelguard", name="SentinelGuard", version="2.0.0-SNAPSHOT", authors={"azicoo"})
+@Plugin(id="sentinelguard", name="SentinelGuard", version="2.1.0", authors={"azicoo"})
 public final class SentinelGuardVelocity {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC);
     private final ProxyServer proxy;
@@ -41,6 +44,10 @@ public final class SentinelGuardVelocity {
     private volatile JdbcPunishmentStore store;
     private volatile long lastSequence;
     private volatile boolean denyOnError = true;
+    /** Per-server punishment scope published by the Paper servers (sg_servers), keyed by Paper server-id. */
+    private volatile Map<String, ServerScope> scopes = Map.of();
+    /** Velocity backend name -> Paper server-id; unlisted backends use their own name. */
+    private final Map<String, String> serverIds = new ConcurrentHashMap<>();
     private volatile String unavailableMessage = "Moderation service unavailable. Please try later.";
     private HikariDataSource pool;
     private ScheduledTask poll, reconcile, retry;
@@ -73,6 +80,10 @@ public final class SentinelGuardVelocity {
                     pollIntervalMs=1000
                     # Seconds between full re-checks of every online player
                     reconcileIntervalSeconds=60
+                    # Servers that ignore bans (network.scope.enforce-bans: false on that Paper server) are
+                    # found through the database. If a Velocity server name differs from the Paper
+                    # network.server-id, map it: server.<velocity-name>=<paper-server-id>
+                    #server.lobby=lobby-1
                     """);
                 logger.error("Configure {} and restart. Logins are denied until the database is reachable.", file);
                 return false;
@@ -80,6 +91,10 @@ public final class SentinelGuardVelocity {
             Properties properties = new Properties();
             try (Reader reader = Files.newBufferedReader(file)) { properties.load(reader); }
             denyOnError = Boolean.parseBoolean(properties.getProperty("denyLoginOnDatabaseError", "true"));
+            serverIds.clear();
+            for (String key : properties.stringPropertyNames()) {
+                if (key.startsWith("server.") && key.length() > 7) serverIds.put(key.substring(7), properties.getProperty(key).trim());
+            }
             unavailableMessage = properties.getProperty("unavailableMessage", unavailableMessage);
             HikariConfig config = new HikariConfig();
             config.setPoolName("SentinelGuard-proxy");
@@ -95,6 +110,7 @@ public final class SentinelGuardVelocity {
                 JdbcPunishmentStore ready = new JdbcPunishmentStore(created);
                 ready.initialize();
                 lastSequence = ready.latestSequence();
+                scopes = scopeMap(ready.servers());
                 pool = created;
                 store = ready;
             } catch (Exception e) {
@@ -122,12 +138,77 @@ public final class SentinelGuardVelocity {
             }
             try {
                 var bans = current.activeBans(event.getPlayer().getUniqueId(), ip(event.getPlayer()), Instant.now());
-                if (!bans.isEmpty()) event.setResult(ComponentResult.denied(screen(bans.get(0))));
+                // With a ban-exempt server on the network the player may still connect to it; every other
+                // server is blocked in preConnect. Without one, the ban is a full network ban as before.
+                if (!bans.isEmpty() && exemptServers().isEmpty()) event.setResult(ComponentResult.denied(screen(bans.get(0))));
             } catch (Exception e) {
                 logger.warn("Could not check login punishment", e);
                 if (denyOnError) event.setResult(ComponentResult.denied(Component.text(unavailableMessage, NamedTextColor.RED)));
             }
         });
+    }
+
+    /**
+     * Server switches and the first connection. A banned player may only be on servers that ignore bans:
+     * they are sent to one on login, and kept out of the others afterwards.
+     */
+    @Subscribe public EventTask preConnect(ServerPreConnectEvent event) {
+        return EventTask.async(() -> {
+            JdbcPunishmentStore current = store;
+            Optional<RegisteredServer> target = event.getResult().getServer();
+            if (current == null || target.isEmpty() || !enforcesBans(target.get())) return;
+            Player player = event.getPlayer();
+            List<NetworkPunishment> bans;
+            try {
+                bans = current.activeBans(player.getUniqueId(), ip(player), Instant.now());
+            } catch (Exception e) {
+                logger.warn("Could not check server connection punishment", e);
+                if (denyOnError) deny(event, player, Component.text(unavailableMessage, NamedTextColor.RED));
+                return;
+            }
+            if (bans.isEmpty()) return;
+            Optional<RegisteredServer> previous = event.getPreviousServer() != null ? Optional.of(event.getPreviousServer()) : Optional.empty();
+            Optional<RegisteredServer> refuge = exemptServers().stream().findFirst();
+            if (previous.isEmpty() && refuge.isPresent()) {
+                event.setResult(ServerPreConnectEvent.ServerResult.allowed(refuge.get())); // first join: land on a server that allows them
+                return;
+            }
+            deny(event, player, screen(bans.get(0)));
+        });
+    }
+
+    private void deny(ServerPreConnectEvent event, Player player, Component message) {
+        event.setResult(ServerPreConnectEvent.ServerResult.denied());
+        if (event.getPreviousServer() == null) player.disconnect(message); else player.sendMessage(message);
+    }
+
+    private String serverId(RegisteredServer server) {
+        String name = server.getServerInfo().getName();
+        return serverIds.getOrDefault(name, name);
+    }
+
+    /** Unknown servers enforce bans, so a missing scope row never lets a banned player in. */
+    private boolean enforcesBans(RegisteredServer server) {
+        ServerScope scope = scopes.get(serverId(server));
+        return scope == null || scope.enforceBans();
+    }
+
+    private List<RegisteredServer> exemptServers() {
+        return proxy.getAllServers().stream().filter(server -> !enforcesBans(server)).toList();
+    }
+
+    private static Map<String, ServerScope> scopeMap(Collection<ServerScope> rows) {
+        Map<String, ServerScope> map = new HashMap<>();
+        for (ServerScope row : rows) map.put(row.serverId(), row);
+        return Map.copyOf(map);
+    }
+
+    private void refreshScopes(JdbcPunishmentStore current) {
+        try {
+            scopes = scopeMap(current.servers());
+        } catch (Exception e) {
+            logger.warn("Could not refresh server punishment scopes; keeping the previous ones", e);
+        }
     }
 
     /** Applies newly committed bans immediately; the outbox only names rows, state is re-read from SQL. */
@@ -158,6 +239,7 @@ public final class SentinelGuardVelocity {
     private void reconcileAll() {
         JdbcPunishmentStore current = store;
         if (current == null) return;
+        refreshScopes(current);
         Collection<Player> online = proxy.getAllPlayers();
         if (online.isEmpty()) return;
         try {
@@ -181,7 +263,18 @@ public final class SentinelGuardVelocity {
         for (Player player : proxy.getAllPlayers()) {
             boolean account = player.getUniqueId().equals(p.player());
             boolean address = p.type() == NetworkPunishment.Type.IP_BAN && p.ip() != null && p.ip().equals(ip(player));
-            if (account || address) player.disconnect(screen(p));
+            if (!account && !address) continue;
+            // A player already on a ban-exempt server stays; only enforcing servers (or limbo) lose them.
+            boolean exempt = player.getCurrentServer().map(connection -> !enforcesBans(connection.getServer())).orElse(false);
+            if (exempt) continue;
+            Optional<RegisteredServer> refuge = exemptServers().stream().findFirst();
+            if (refuge.isPresent() && player.getCurrentServer().isPresent()) {
+                // Moved, not disconnected: the ban does not apply on the exempt server.
+                player.sendMessage(screen(p));
+                player.createConnectionRequest(refuge.get()).fireAndForget();
+            } else {
+                player.disconnect(screen(p));
+            }
         }
     }
 

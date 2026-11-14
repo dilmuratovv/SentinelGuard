@@ -197,8 +197,8 @@ def main():
     paper = fetch(next(s for s in matrix['servers'] if s['version'] == args.target), deps)
     velocity_entry = next(v for v in matrix['velocity'] if v['version'] == args.velocity_version)
     velocity = fetch(velocity_entry, deps)
-    paper_plugin = args.paper_jar or next((ROOT / 'paper/target').glob(f'SentinelGuard-*-paper{args.target}.jar'))
-    velocity_plugin = args.velocity_jar or next(p for p in (ROOT / 'velocity/target').glob(f'SentinelGuard-*-velocity{args.velocity_version}.jar') if not p.name.startswith('original-'))
+    paper_plugin = args.paper_jar or next((ROOT / 'paper/target').glob('SentinelGuard-*-paper.jar'))
+    velocity_plugin = args.velocity_jar or next(p for p in (ROOT / 'velocity/target').glob('SentinelGuard-*-velocity.jar') if not p.name.startswith('original-'))
     client_version = args.client_version or args.target
 
     reset_database(args)
@@ -485,7 +485,7 @@ def main():
 
 
 def velocity_jar(args):
-    return args.velocity_jar or next(p for p in (ROOT / 'velocity/target').glob(f'SentinelGuard-*-velocity{args.velocity_version}.jar') if not p.name.startswith('original-'))
+    return args.velocity_jar or next(p for p in (ROOT / 'velocity/target').glob('SentinelGuard-*-velocity.jar') if not p.name.startswith('original-'))
 
 
 def query(args, sql):

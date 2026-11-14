@@ -46,7 +46,7 @@ public class UnbanIpCommand implements CommandExecutor, TabCompleter {
 
         String reason = reasonTokens.isEmpty() ? "Bekor qilindi" : String.join(" ", reasonTokens).trim();
         boolean finalSilent = silent;
-        plugin.getPunishmentManager().unbanIp(ip, sender, reason, success -> {
+        plugin.getPunishmentManager().unbanIp(ip, sender, reason, finalSilent, success -> {
             if (success) {
                 plugin.getPunishmentFormatter().broadcastUnpunish(PunishmentType.IP_BAN, ip, sender.getName(), reason, finalSilent);
             } else {
