@@ -180,7 +180,10 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/SentinelGuard-*.jar dist/SHA256SUMS.txt --title "SentinelGuard ${GITHUB_REF_NAME#paper-v} for Paper" --notes-file docs/RELEASE-paper.md --verify-tag
+        run: |
+          # A release published by hand (signed JARs) is kept as it is.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then echo "Release $GITHUB_REF_NAME already exists; keeping it."; exit 0; fi
+          gh release create "$GITHUB_REF_NAME" dist/SentinelGuard-*.jar dist/SHA256SUMS.txt --title "SentinelGuard ${GITHUB_REF_NAME#paper-v} for Paper" --notes-file docs/RELEASE-paper.md --verify-tag
 
   release-velocity:
     if: startsWith(github.ref, 'refs/tags/velocity-v')
@@ -205,4 +208,7 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/SentinelGuard-*.jar dist/SHA256SUMS.txt --title "SentinelGuard ${GITHUB_REF_NAME#velocity-v} for Velocity" --notes-file docs/RELEASE-velocity.md --verify-tag
+        run: |
+          # A release published by hand (signed JARs) is kept as it is.
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then echo "Release $GITHUB_REF_NAME already exists; keeping it."; exit 0; fi
+          gh release create "$GITHUB_REF_NAME" dist/SentinelGuard-*.jar dist/SHA256SUMS.txt --title "SentinelGuard ${GITHUB_REF_NAME#velocity-v} for Velocity" --notes-file docs/RELEASE-velocity.md --verify-tag

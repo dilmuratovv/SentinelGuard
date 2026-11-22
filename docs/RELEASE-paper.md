@@ -1,39 +1,22 @@
-SentinelGuard 2.1 for Paper: per-server scope and network announcements.
+SentinelGuard 2.2 for Paper: the moderation hub of the Sentinel suite.
 
-- **One JAR for every Paper version.** `SentinelGuard-2.1.0-paper.jar` runs on Paper 1.21 through 26.3 (previously 15 separate JARs). CI checks it against every supported API.
+- **SentinelAD and SentinelAX-ray flags go to `/sus`.** Guard connects automatically to SentinelAD (anti-dupe) and SentinelAX-ray (anti-xray) when they are installed, and adds their findings to `/sus` with the plugin name, finding type and description (`SentinelAD: ledger-mismatch - ...`, `SentinelAX-ray: xray-mining - ...`). Test flags (`/sad testflag`, `/sxray testflag`) never count. Guard only observes: it never changes what the other plugins block or log.
+- **New config section** (defaults shown):
+  ```yaml
+  integrations:
+    sentinelad:
+      enabled: true
+      min-confidence: 60
+      sus-threshold: 1
+    sentinelaxray:          # statistical, so a higher bar
+      enabled: true
+      min-confidence: 70
+      sus-threshold: 1
+  ```
+  `sus-threshold` is the number of findings of one type within 10 minutes before the player is added.
+- **`/sg status`** shows whether SentinelAC, SentinelAD and SentinelAX-ray are connected, and the live protection state of SentinelAX-ray and SentinelAE.
+- Hooks survive `/sg reload` and plugins enabled or disabled later; with none of them installed Guard works exactly as before.
 
-- **Server scope.** `network.scope.enforce-bans` and `enforce-mutes` decide whether bans and mutes from other servers apply on this server. A lobby can let banned players in while the rest of the network stays protected.
-- **Network announcements.** Ban, IP ban, mute, warn, unban and unmute issued on one server are announced on every server that enforces them (`network.scope.announce-remote`, on by default). Silent (`-s`) unbans stay staff-only everywhere. This replaces `network.broadcast-remote-punishments`.
-- **Fix.** The time of a revocation no longer depends on the last nullable column read.
-- **Upgrade.** The shared database moves to schema 4 on first start; upgrade every Paper server and the proxy together.
+One JAR for Paper 1.21 through 26.3 (Java 21; Java 25 on 26.x). The Velocity plugin is a separate release (`velocity-v*`); upgrading it is optional (no functional change).
 
-## Also in 2.0 (shared database)
-
-The Velocity plugin is a separate release (`velocity-v*`). Network mode needs both plus one MariaDB database.
-
-- **Shared database.** MariaDB is now the source of truth for bans, IP bans (IPv4 and IPv6), mutes, warnings, kicks and history across Velocity and every Paper server. Each change is written in the same transaction as its outbox row.
-- **Velocity enforcement.**
-  - Logins are denied for account bans and IP bans.
-  - A player who is already online is disconnected about 1 s after a ban commits.
-  - A batched re-check of everyone online runs periodically.
-  - When the database is unreachable, logins are denied (configurable) and bans are never bypassed.
-- **Everything in one database.**
-  - Player names and UUIDs, every IP a player used, the `/sus` list, freeze and kick are shared, not only punishments.
-  - A command on any server works on a player who joined another one.
-  - `/freeze` and `/kick` act on players on other servers, and a frozen player stays frozen on the next server.
-- **Robustness.**
-  - A server with a fast clock no longer delays a ban elsewhere.
-  - Database deadlocks are retried.
-  - Old outbox rows are pruned (default 7 days).
-- **Redis is optional.** It only sends wake signals and carries network staff chat. SQL polling keeps servers correct without it.
-- **Legacy import.** Guard 1.x `punishments.yml` is imported once and left unchanged.
-- **Fixes.**
-  - IPv6 addresses are now handled correctly.
-  - Saving is asynchronous and atomic.
-  - Reloading no longer discards unsaved data.
-  - Unmuting no longer clears an IP-ban index.
-  - Custom control-GUI slots now run the right action and check the right permission.
-  - A null address no longer crashes the GUI kick.
-- **Optional SentinelAC.** SentinelAC is still optional and is detected automatically.
-
-Checksums are in `SHA256SUMS.txt`.
+The attached JAR is signed with the Sentinel suite certificate (`CN=Sentinel Suite`, SHA-256 `64:10:FE:2E:43:F2:23:F6:BD:55:94:BA:20:26:F2:54:0B:36:D7:26:F1:2D:69:4E:4C:B5:BF:22:03:C3:82:91`, self-signed). Check with `jarsigner -verify -certs SentinelGuard-2.2.0-paper.jar`. Checksums are in `SHA256SUMS.txt`.

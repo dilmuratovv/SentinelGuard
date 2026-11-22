@@ -1,21 +1,6 @@
-SentinelGuard 2.1 for Velocity: follows the per-server scope.
+SentinelGuard 2.2 for Velocity: version aligned with SentinelGuard 2.2.0 for Paper.
 
-- **One JAR for every Velocity version.** `SentinelGuard-2.1.0-velocity.jar` runs on Velocity 3.5.1 through 4.3.1 and on Java 17 or newer (previously 5 separate JARs).
+- No functional change from 2.1.0; the 2.2 Paper plugin uses the same database schema (4), so a 2.1.0 proxy keeps working with 2.2.0 Paper servers.
+- One JAR for Velocity 3.5.1 through 4.3.1 (Java 17 or newer; Velocity 4.x itself needs Java 25).
 
-- A server with `network.scope.enforce-bans: false` is found through the shared database. Banned players may connect to it; every other server refuses them and they land on the exempt server at login.
-- A ban issued while the player is on an enforcing server moves them to a ban-exempt server instead of disconnecting. With no exempt server, bans stay full network bans.
-- Optional `server.<velocity-name>=<paper-server-id>` lines in `database.properties` map differing names.
-- Upgrade the proxy together with the Paper servers (database schema 4).
-
-## Also in 2.0 (shared database)
-
-Velocity 4.x itself needs Java 25; Velocity 3.5.1 runs on Java 17 or newer.
-
-- Denies logins for account bans and IP bans (IPv4 and IPv6) from the shared database.
-- Disconnects a player who is already online about a second after a ban or `/kick`.
-- If the database is unreachable, logins are denied (configurable) and the connection is retried automatically.
-- `/sgproxy` shows the connection status (permission `sentinelguard.proxy.admin`).
-
-Setup: start the proxy once, edit `plugins/sentinelguard/database.properties` to use the same database as your Paper servers, then restart. The Paper servers are a separate release.
-
-Checksums are in `SHA256SUMS.txt`.
+The attached JAR is signed with the Sentinel suite certificate (`CN=Sentinel Suite`, SHA-256 `64:10:FE:2E:43:F2:23:F6:BD:55:94:BA:20:26:F2:54:0B:36:D7:26:F1:2D:69:4E:4C:B5:BF:22:03:C3:82:91`, self-signed). Checksums are in `SHA256SUMS.txt`.
