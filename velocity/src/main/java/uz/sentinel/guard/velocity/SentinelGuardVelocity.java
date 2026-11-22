@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * IP), disconnects players as soon as a ban commits (outbox), and periodically re-checks everyone online.
  * Moderation commands run on the Paper servers; the proxy only enforces.
  */
-@Plugin(id="sentinelguard", name="SentinelGuard", version="2.1.0", authors={"azicoo"})
+@Plugin(id="sentinelguard", name="SentinelGuard", version="2.2.0", authors={"azicoo"})
 public final class SentinelGuardVelocity {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC);
     private final ProxyServer proxy;

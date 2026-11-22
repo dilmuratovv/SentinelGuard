@@ -98,6 +98,8 @@ public final class SentinelAcHook implements Listener, AutoCloseable {
         if (bus != null) try { unregister.invoke(bus, owner); } catch (ReflectiveOperationException e) { plugin.getLogger().warning("SentinelAC listener cleanup failed."); }
         bus = null; owner = null; unregister = null; pending.clear(); counts.clear();
     }
+    public boolean isConnected() { return bus != null; }
+
     @Override public void close() {
         if (task != null) task.cancel();
         detach(); HandlerList.unregisterAll(this);

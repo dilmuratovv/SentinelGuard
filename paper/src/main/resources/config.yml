@@ -343,8 +343,17 @@ control-gui:
         - ""
         - "&4» Bosib ro'yxatdan o'chiring"
 
-# Optional; SentinelGuard also runs without SentinelAC.
+# Optional; SentinelGuard also runs without SentinelAC, SentinelAD and SentinelAX-ray.
 integrations:
+  sentinelad:
+    enabled: true
+    min-confidence: 60
+    sus-threshold: 1
+  # SentinelAX-ray suspicious-mining flags (statistical, so a higher confidence bar).
+  sentinelaxray:
+    enabled: true
+    min-confidence: 70
+    sus-threshold: 1
   sentinelac:
     enabled: true
     sus-threshold: 10

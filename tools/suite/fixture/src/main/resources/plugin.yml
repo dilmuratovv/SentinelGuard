@@ -1,0 +1,10 @@
+name: SentinelTestFixture
+version: '1.0.0'
+api-version: '1.21'
+main: uz.sentinel.test.Fixture
+commands:
+  suitefixture:
+    permission: sentineltest.console
+permissions:
+  sentineltest.console:
+    default: op

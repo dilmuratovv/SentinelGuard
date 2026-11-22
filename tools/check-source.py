@@ -4,7 +4,7 @@ r=Path(__file__).resolve().parents[1]
 s=(r/'paper/src/main/resources/plugin.yml').read_text()
 assert 'authors: [ azicoo ]' in s
 assert '  sg:' in s and 'aliases: [ sentinelguard, sguard, sentinelg ]' in s
-assert '  sus:' in s and 'softdepend: [ SentinelAC ]' in s
+assert '  sus:' in s and 'softdepend: [ SentinelAC, SentinelAD, SentinelAX-ray, SentinelAE ]' in s
 assert '\ndepend:' not in s
 assert 'main: uz.sentinel.guard.paper.GuardPlugin' in s
 assert (r/'paper/src/main/java/uz/sentinel/guard/paper/GuardPlugin.java').is_file()

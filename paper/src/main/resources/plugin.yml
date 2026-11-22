@@ -3,7 +3,8 @@ version: '${project.version}'
 main: uz.sentinel.guard.paper.GuardPlugin
 api-version: '${guard.api}'
 authors: [ azicoo ]
-softdepend: [ SentinelAC ]
+website: https://github.com/dilmuratovv/SentinelGuard
+softdepend: [ SentinelAC, SentinelAD, SentinelAX-ray, SentinelAE ]
 # Loaded by Paper's library loader from Maven Central; only used in network mode.
 libraries:
   - com.zaxxer:HikariCP:${hikari.version}

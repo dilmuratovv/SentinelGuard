@@ -65,7 +65,12 @@ public class GuardCommand implements CommandExecutor, TabCompleter {
                 } else {
                     sender.sendMessage(config.colorize("&7▎ &fRejim: &eLokal (punishments.yml)"));
                 }
-                sender.sendMessage(config.colorize("&7▎ &fSentinelAC: " + (Bukkit.getPluginManager().isPluginEnabled("SentinelAC") ? "&aaniqlandi" : "&7yo'q (ixtiyoriy)")));
+                sender.sendMessage(config.colorize("&7▎ &fSentinelAC: " + (plugin.isAcConnected() ? "&aulangan" : "&7ulanmagan")));
+                sender.sendMessage(config.colorize("&7▎ &fSentinelAD: " + (plugin.isAdConnected() ? "&aulangan" : "&7ulanmagan")));
+                sender.sendMessage(config.colorize("&7▎ &fSentinelAX-ray flaglari: " + (plugin.isXrayConnected() ? "&aulangan" : "&7ulanmagan")));
+                for (String name : List.of("SentinelAX-ray", "SentinelAE")) {
+                    sender.sendMessage(config.colorize("&7▎ &f" + name + ": &b" + plugin.protectionStatus(name)));
+                }
                 sender.sendMessage(config.colorize("&8============================================="));
                 return true;
             }

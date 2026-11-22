@@ -40,8 +40,24 @@ public class GuardPlugin extends JavaPlugin {
     private ChatInputListener chatInputListener;
     private BukkitTask autoSaveTask;
     private uz.sentinel.guard.paper.integration.SentinelAcHook sentinelAcHook;
+    private uz.sentinel.guard.paper.integration.FlagHook sentinelAdHook;
+    private uz.sentinel.guard.paper.integration.FlagHook sentinelXrayHook;
     private volatile NetworkService network;
     private BukkitTask networkRetryTask;
+
+    public boolean isAcConnected() { return sentinelAcHook != null && sentinelAcHook.isConnected(); }
+    public boolean isAdConnected() { return sentinelAdHook != null && sentinelAdHook.isConnected(); }
+    public boolean isXrayConnected() { return sentinelXrayHook != null && sentinelXrayHook.isConnected(); }
+
+    public String protectionStatus(String pluginName) {
+        var companion = getServer().getPluginManager().getPlugin(pluginName);
+        if (companion == null || !companion.isEnabled()) return "yo'q";
+        try {
+            return (String) companion.getClass().getMethod("getProtectionStatus").invoke(companion);
+        } catch (ReflectiveOperationException | ClassCastException | LinkageError ex) {
+            return "status API mavjud emas";
+        }
+    }
 
     @Override
     public void onEnable() {
@@ -84,6 +100,12 @@ public class GuardPlugin extends JavaPlugin {
 
         sentinelAcHook = new uz.sentinel.guard.paper.integration.SentinelAcHook(this);
         sentinelAcHook.start();
+        sentinelAdHook = new uz.sentinel.guard.paper.integration.FlagHook(this, "SentinelAD",
+                "uz.sentinel.ad.api.DupeFlagEvent", "sentinelad", 60);
+        sentinelAdHook.start();
+        sentinelXrayHook = new uz.sentinel.guard.paper.integration.FlagHook(this, "SentinelAX-ray",
+                "uz.sentinel.xray.api.XrayFlagEvent", "sentinelaxray", 70);
+        sentinelXrayHook.start();
 
         // Periodic auto-save task
         long saveInterval = this.getConfig().getLong("settings.save-interval-minutes", 5L) * 1200L;
@@ -259,6 +281,8 @@ public class GuardPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (sentinelXrayHook != null) sentinelXrayHook.close();
+        if (sentinelAdHook != null) sentinelAdHook.close();
         if (sentinelAcHook != null) sentinelAcHook.close();
         if (networkRetryTask != null) networkRetryTask.cancel();
         if (this.autoSaveTask != null) {
