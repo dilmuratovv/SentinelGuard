@@ -9,6 +9,7 @@ A Minecraft moderation project by **azicoo** for Paper servers and Velocity netw
 [![Build](https://github.com/dilmuratovv/SentinelGuard/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/dilmuratovv/SentinelGuard/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/dilmuratovv/SentinelGuard?color=ec4899&label=release)](https://github.com/dilmuratovv/SentinelGuard/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Paper](https://img.shields.io/badge/paper-1.21%20%E2%80%93%2026.3-0ea5e9.svg)](#compatibility)
 [![Author](https://img.shields.io/badge/author-azicoo-8b5cf6.svg)](https://github.com/dilmuratovv/SentinelGuard)
 
 [Download](https://github.com/dilmuratovv/SentinelGuard/releases) · [Installation](#installation) · [Network mode](#network-mode) · [Commands](#commands) · [Compatibility](#compatibility)
@@ -23,9 +24,23 @@ SentinelGuard works on a single Paper server out of the box. When you run severa
 
 **One JAR for Paper and one for Velocity**, published as two separate releases. The Paper JAR runs on every supported Paper version (1.21 to 26.3) and the Velocity JAR on every supported Velocity version (3.5.1 to 4.3.1).
 
-[SentinelAC](https://github.com/dilmuratovv/SentinelAC) is **optional**. If it is installed, SentinelGuard detects it and adds players to `/sus` after repeated flags. It never changes SentinelAC enforcement, and every moderation feature works without it.
+The other Sentinel plugins are **optional**. If [SentinelAC](https://github.com/dilmuratovv/SentinelAC), [SentinelAD](https://github.com/dilmuratovv/SentinelAD) or [SentinelAX-ray](https://github.com/dilmuratovv/SentinelAX-ray) is installed, SentinelGuard detects it and adds the flagged players to `/sus`. It never changes how they enforce, and every moderation feature works without them. SentinelGuard is part of the [Sentinel suite](#sentinel-suite).
 
 **Created and maintained by azicoo.**
+
+## Sentinel suite
+
+Five plugins by **azicoo**, each with its own repository and release. Every one works on its own.
+
+| Plugin | What it does |
+|---|---|
+| [SentinelAC](https://github.com/dilmuratovv/SentinelAC) | Anticheat: prediction-based movement, combat and packet checks. |
+| [SentinelAD](https://github.com/dilmuratovv/SentinelAD) | Anti-dupe: a global item ledger that removes duplicated items. |
+| [SentinelAE](https://github.com/dilmuratovv/SentinelAE) | Anti-ESP: hidden players and armor stands are never sent to the client. |
+| [SentinelAX-ray](https://github.com/dilmuratovv/SentinelAX-ray) | Anti-xray: Paper's native engine set up per world, plus mining analysis. |
+| [SentinelGuard](https://github.com/dilmuratovv/SentinelGuard) | Moderation: bans, mutes, history, `/sus`; collects the flags of AC, AD and AX-ray. |
+
+Together: SentinelGuard adds the findings of SentinelAC, SentinelAD and SentinelAX-ray to `/sus`, and `/sg status` shows the state of SentinelAE and SentinelAX-ray. All five are GPL-3.0 and run on Paper 1.21 to 26.3 with one JAR each (SentinelGuard also has a Velocity JAR).
 
 ## Features
 
@@ -34,7 +49,7 @@ SentinelGuard works on a single Paper server out of the box. When you run severa
 | **Punishments** | Ban, IP ban (IPv4 and IPv6), mute, warn, kick and their reversals, with durations, reasons and silent (`-s`) mode. |
 | **History** | `/history` GUI, `/staffhistory`, warnings list, and a control GUI for each player. |
 | **Alt detection** | Every IP a player used is stored, so `/alts` and join alerts see accounts from all servers. |
-| **Suspicious list** | `/sus` GUI with reasons and history; optionally fed by SentinelAC flags. |
+| **Suspicious list** | `/sus` GUI with reasons and history; optionally fed by SentinelAC, SentinelAD and SentinelAX-ray flags. |
 | **Freeze** | `/freeze` blocks movement and chat; a frozen player stays frozen after joining another server. |
 | **Staff chat** | `/staffchat` on one server; network-wide when Redis is enabled. |
 | **Shared database** | Punishments, player names and UUIDs, IPs, `/sus`, freeze and kick live in one MariaDB. |

@@ -1,8 +1,24 @@
-**/target/
+# Build output
+target/
+build/
+*.class
+
+# IDE and system files
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+
+# Local tooling
 .tools/
 backup/
-*.jar
-.idea/
-*.log
-node_modules/
 .internal/
+node_modules/
+__pycache__/
+*.py[cod]
+
+# Release JARs are published as GitHub releases, not committed.
+/*.jar
