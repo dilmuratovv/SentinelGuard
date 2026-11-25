@@ -52,18 +52,13 @@ public class SusCommand implements CommandExecutor, TabCompleter {
                 }
                 String targetName = args[0];
                 String reason = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).trim();
-                OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
-                if (target == null || (target.getName() == null && !target.hasPlayedBefore())) {
-                    sender.sendMessage(config.getMessage("player-not-found"));
-                    return true;
-                }
-                if (plugin.isImmune(sender, target.getUniqueId())) {
+                uz.sentinel.guard.paper.util.Targets.resolve(plugin, sender, targetName, (targetUuid, shownName) -> {
+                if (plugin.isImmune(sender, targetUuid)) {
                     sender.sendMessage(config.getMessage("cannot-target-staff"));
-                    return true;
+                    return;
                 }
                 String staffName = (sender instanceof Player) ? sender.getName() : "Console";
-                String shownName = target.getName() != null ? target.getName() : targetName;
-                plugin.getSusManager().addSus(target.getUniqueId(), shownName, reason, staffName, count -> {
+                plugin.getSusManager().addSus(targetUuid, shownName, reason, staffName, count -> {
                     if (count == -1) {
                         sender.sendMessage(config.getMessage("cannot-sus-admin"));
                         return;
@@ -72,6 +67,7 @@ public class SusCommand implements CommandExecutor, TabCompleter {
                             .replace("{player}", shownName)
                             .replace("{reason}", reason)
                             .replace("{count}", String.valueOf(count)));
+                });
                 });
                 return true;
             }

@@ -38,6 +38,7 @@ public class GuardPlugin extends JavaPlugin {
     private SusManager susManager;
     private FreezeManager freezeManager;
     private ChatInputListener chatInputListener;
+    private uz.sentinel.guard.paper.util.StaffRegistry staffRegistry;
     private BukkitTask autoSaveTask;
     private uz.sentinel.guard.paper.integration.SentinelAcHook sentinelAcHook;
     private uz.sentinel.guard.paper.integration.FlagHook sentinelAdHook;
@@ -70,6 +71,7 @@ public class GuardPlugin extends JavaPlugin {
         this.altManager = new AltManager(this);
         this.susManager = new SusManager(this);
         this.freezeManager = new FreezeManager(this);
+        this.staffRegistry = new uz.sentinel.guard.paper.util.StaffRegistry(this);
 
         // Network mode: SQL is authoritative. Starts before listeners so no login is checked against local data.
         ConfigurationSection networkConfig = getConfig().getConfigurationSection("network");
@@ -144,6 +146,7 @@ public class GuardPlugin extends JavaPlugin {
                 punishmentManager.attachNetwork(service, Math.max(100, section.getInt("cache-size", 20000)));
                 altManager.attachNetwork(service, players);
                 susManager.attachNetwork(service, sus);
+                staffRegistry.attachNetwork(service.store());
                 punishmentManager.setNetworkUnavailable(false);
                 if (networkRetryTask != null) networkRetryTask.cancel();
                 getLogger().info("Network database connected as server '" + service.serverId() + "'.");
@@ -193,7 +196,8 @@ public class GuardPlugin extends JavaPlugin {
         if (network == null) {
             org.bukkit.entity.Player target = Bukkit.getPlayer(uuid);
             if (target == null) {
-                done.accept(false);
+                // standalone: an offline player can only be released from a parked freeze (and its return deadline)
+                done.accept(!freeze && freezeManager.wasFrozen(uuid));
                 return;
             }
             done.accept(freeze ? freezeManager.freezePlayer(target, issuer) : freezeManager.unfreezePlayer(target, issuer));
@@ -305,6 +309,7 @@ public class GuardPlugin extends JavaPlugin {
         if (punishmentManager != null) punishmentManager.detachNetwork();
         if (altManager != null) altManager.detachNetwork();
         if (susManager != null) susManager.detachNetwork();
+        if (staffRegistry != null) staffRegistry.detachNetwork();
         if (service != null) service.close();
         getLogger().info("Guard plagini to'xtatildi va barcha ma'lumotlar saqlandi.");
         instance = null;
@@ -313,6 +318,9 @@ public class GuardPlugin extends JavaPlugin {
     public void reloadPlugin() {
         if (this.configManager != null) {
             this.configManager.reload();
+        }
+        if (this.sentinelAcHook != null) {
+            this.sentinelAcHook.clearRules();
         }
         if (this.punishmentManager != null) {
             this.punishmentManager.loadData();
@@ -330,16 +338,11 @@ public class GuardPlugin extends JavaPlugin {
         // Console can manage anyone
         if (!(sender instanceof org.bukkit.entity.Player)) return false;
 
-        org.bukkit.entity.Player target = Bukkit.getPlayer(targetUuid);
-        if (target != null) {
-            return target.isOp() ||
-                    target.hasPermission("guard.admin.bypass") ||
-                    target.hasPermission("guard.admin") ||
-                    target.hasPermission("guard.staff") ||
-                    target.hasPermission("sus.admin");
-        }
-        org.bukkit.OfflinePlayer op = Bukkit.getOfflinePlayer(targetUuid);
-        return op.isOp();
+        return staffRegistry.isStaff(targetUuid);
+    }
+
+    public uz.sentinel.guard.paper.util.StaffRegistry getStaffRegistry() {
+        return staffRegistry;
     }
 
     public static GuardPlugin getInstance() {

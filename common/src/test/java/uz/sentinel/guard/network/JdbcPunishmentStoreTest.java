@@ -18,7 +18,7 @@ class JdbcPunishmentStoreTest {
     }
     DataSource ds = new DriverManagerSource(url, System.getenv("SG_TEST_JDBC_USER"), System.getenv("SG_TEST_JDBC_PASSWORD"));
     try (var c = ds.getConnection(); var s = c.createStatement()) {
-      for (String table : new String[]{"sg_outbox", "sg_punishments", "sg_schema", "sg_players", "sg_player_ips", "sg_sus", "sg_sus_log", "sg_servers"}) s.execute("DROP TABLE IF EXISTS " + table);
+      for (String table : new String[]{"sg_outbox", "sg_punishments", "sg_schema", "sg_players", "sg_player_ips", "sg_sus", "sg_sus_log", "sg_servers", "sg_staff"}) s.execute("DROP TABLE IF EXISTS " + table);
     }
     return ds;
   }
@@ -114,11 +114,47 @@ class JdbcPunishmentStoreTest {
     String ip = IpAddresses.normalize("[2001:DB8::1]:25565");
     store.create(of(NetworkPunishment.Type.IP_BAN, owner, ip, T0, null));
     assertEquals(1, store.activeBans(alt, "/2001:db8:0:0:0:0:0:1", T0.plusMillis(1)).size());
-    assertTrue(store.activeBans(alt, "2001:db8::2", T0.plusMillis(1)).isEmpty());
+    // one subscriber holds the whole /64: another address in it is the same household, another /64 is not
+    assertEquals(1, store.activeBans(alt, "2001:db8::2", T0.plusMillis(1)).size());
+    assertEquals(1, store.activeBans(alt, "2001:db8:0:0:ffff:1:2:3", T0.plusMillis(1)).size());
+    assertTrue(store.activeBans(alt, "2001:db8:0:1::1", T0.plusMillis(1)).isEmpty());
+    assertEquals("2001:db8:0:0::/64", store.active(owner, T0.plusMillis(1)).get(0).ip(), "stored as the network");
     assertEquals(1, store.activeBans(owner, null, T0.plusMillis(1)).size());
     var raw = of(NetworkPunishment.Type.IP_BAN, null, IpAddresses.normalize("10.0.0.7"), T0, null); store.create(raw);
     assertEquals(1, store.revokeActive(null, "10.0.0.7:1234", EnumSet.of(NetworkPunishment.Type.IP_BAN), by("admin")).size());
     assertEquals(1, store.activeBans(alt, ip, T0.plusMillis(20)).size(), "unrelated IP ban stays");
+  }
+  @Test void ipv6UnbanFromAnyAddressInTheNetworkAndLegacyExactRows() throws Exception {
+    var ds = source(); var store = store(ds); UUID owner = UUID.randomUUID(), alt = UUID.randomUUID();
+    store.create(of(NetworkPunishment.Type.IP_BAN, owner, IpAddresses.normalize("2a02:4780:1:2::99"), T0, null));
+    assertEquals(1, store.revokeActive(null, "2a02:4780:1:2:abcd::1", EnumSet.of(NetworkPunishment.Type.IP_BAN), by("admin")).size());
+    assertTrue(store.activeBans(alt, "2a02:4780:1:2::99", T0.plusMillis(20)).isEmpty());
+    // a row written by 2.2.x holds the exact address: still enforced for that address, and found by the batch lookup
+    try (var c = ds.getConnection(); var st = c.prepareStatement("UPDATE sg_punishments SET ip=?, revoked=FALSE WHERE player_uuid=?")) {
+      st.setString(1, IpAddresses.normalize("2a02:4780:1:2::99")); st.setString(2, owner.toString()); st.executeUpdate();
+    }
+    assertEquals(1, store.activeBans(alt, "2a02:4780:1:2::99", T0.plusMillis(30)).size());
+    assertEquals(1, store.activeIpBans(List.of("2a02:4780:1:2::99"), T0.plusMillis(30)).size());
+  }
+  @Test void staffIsSharedAndRemovable() throws Exception {
+    var ds = source(); var a = store(ds); var b = new JdbcPunishmentStore(ds); UUID mod = UUID.randomUUID(), helper = UUID.randomUUID();
+    a.setStaff(mod, true, T0); a.setStaff(helper, true, T0); a.setStaff(mod, true, T1);
+    assertEquals(Set.of(mod, helper), b.staff());
+    b.setStaff(helper, false, T1);
+    assertEquals(Set.of(mod), a.staff());
+  }
+  @Test void ipNetworks() {
+    assertEquals("1.2.3.4", IpAddresses.network("/1.2.3.4:25565"));
+    assertEquals("2001:db8:1:2::/64", IpAddresses.network("2001:db8:1:2:3:4:5:6"));
+    assertEquals("2001:db8:1:2::/64", IpAddresses.network("2001:0DB8:0001:0002::/64"));
+    assertEquals("2001:db8:1:2::/64", IpAddresses.normalize("2001:db8:1:2::/64"));
+    assertEquals("1.2.3.4", IpAddresses.network("::ffff:1.2.3.4"), "IPv4-mapped is IPv4");
+    assertNull(IpAddresses.normalize("1.2.3.0/24")); assertNull(IpAddresses.normalize("2001:db8::/48"));
+    assertTrue(IpAddresses.sameNetwork("2001:db8::1", "[2001:db8::ffff]:25565"));
+    assertFalse(IpAddresses.sameNetwork("2001:db8::1", "2001:db8:0:1::1"));
+    assertFalse(IpAddresses.sameNetwork("10.0.0.1", "10.0.0.2"));
+    assertEquals(List.of("2001:db8:0:0:0:0:0:1", "2001:db8:0:0::/64"), IpAddresses.banForms("2001:db8::1"));
+    assertEquals(List.of("10.0.0.1"), IpAddresses.banForms("10.0.0.1"));
   }
   @Test void plainBanOnSharedIpIsNotRevokedByIpUnban() throws Exception {
     var ds = source(); var store = store(ds); UUID player = UUID.randomUUID();

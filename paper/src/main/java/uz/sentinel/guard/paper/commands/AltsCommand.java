@@ -1,6 +1,7 @@
 package uz.sentinel.guard.paper.commands;
 
 import uz.sentinel.guard.paper.GuardPlugin;
+import uz.sentinel.guard.network.IpAddresses;
 import uz.sentinel.guard.paper.config.ConfigManager;
 import uz.sentinel.guard.paper.punishment.PunishmentRecord;
 import org.bukkit.Bukkit;
@@ -39,16 +40,13 @@ public class AltsCommand implements CommandExecutor, TabCompleter {
         String displayTitle;
         String ip;
 
-        if (input.matches("^(\\d{1,3}\\.){3}\\d{1,3}$")) {
-            ip = input;
+        if (IpAddresses.isIp(input)) {
+            ip = IpAddresses.normalize(input);
             alts = plugin.getAltManager().getAltsByIp(ip);
             displayTitle = "IP: " + ip;
         } else {
-            UUID uuid = plugin.getAltManager().getUuidByName(input);
-            OfflinePlayer op = Bukkit.getOfflinePlayer(input);
-            if (uuid == null && op != null) {
-                uuid = op.getUniqueId();
-            }
+            var known = uz.sentinel.guard.paper.util.Targets.known(plugin, input);
+            UUID uuid = known == null ? null : known.uuid();
             if (uuid == null) {
                 sender.sendMessage(config.getPrefix() + config.colorize("&cO'yinchi topilmadi!"));
                 return true;

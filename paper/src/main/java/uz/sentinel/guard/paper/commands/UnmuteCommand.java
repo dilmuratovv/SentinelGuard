@@ -33,41 +33,26 @@ public class UnmuteCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        String targetName = args[0];
         boolean silent = false;
         List<String> reasonTokens = new ArrayList<>();
-
         for (int i = 1; i < args.length; i++) {
-            if (args[i].equalsIgnoreCase("-s") || args[i].equalsIgnoreCase("--silent")) {
-                silent = true;
-            } else {
-                reasonTokens.add(args[i]);
-            }
+            if (args[i].equalsIgnoreCase("-s") || args[i].equalsIgnoreCase("--silent")) silent = true;
+            else reasonTokens.add(args[i]);
         }
-
         String reason = reasonTokens.isEmpty() ? "Bekor qilindi" : String.join(" ", reasonTokens).trim();
-        UUID targetUuid = plugin.getAltManager().getUuidByName(targetName);
-        OfflinePlayer op = Bukkit.getOfflinePlayer(targetName);
-        if (targetUuid == null && op != null) {
-            targetUuid = op.getUniqueId();
-            if (op.getName() != null) targetName = op.getName();
-        }
-
-        String finalName = targetName;
-        UUID finalTarget = targetUuid;
         boolean finalSilent = silent;
-        plugin.getPunishmentManager().unmute(targetUuid, sender, reason, finalSilent, success -> {
-            if (success) {
-                plugin.getPunishmentFormatter().broadcastUnpunish(PunishmentType.MUTE, finalName, sender.getName(), reason, finalSilent);
-                Player targetOnline = (finalTarget != null) ? Bukkit.getPlayer(finalTarget) : null;
-                if (targetOnline != null && targetOnline.isOnline()) {
-                    targetOnline.sendMessage(config.getPrefix() + config.colorize("&aOvozingiz qayta ochildi! Xushmuomala bo'lishni unutmang."));
+        uz.sentinel.guard.paper.util.Targets.resolve(plugin, sender, args[0], (targetUuid, finalName) ->
+            plugin.getPunishmentManager().unmute(targetUuid, sender, reason, finalSilent, success -> {
+                if (success) {
+                    plugin.getPunishmentFormatter().broadcastUnpunish(PunishmentType.MUTE, finalName, sender.getName(), reason, finalSilent);
+                    Player targetOnline = Bukkit.getPlayer(targetUuid);
+                    if (targetOnline != null && targetOnline.isOnline()) {
+                        targetOnline.sendMessage(config.getPrefix() + config.colorize("&aOvozingiz qayta ochildi! Xushmuomala bo'lishni unutmang."));
+                    }
+                } else {
+                    sender.sendMessage(config.getPrefix() + config.colorize("&cO'yinchi &e" + finalName + " &cmute qilinmagan yoki topilmadi!"));
                 }
-            } else {
-                sender.sendMessage(config.getPrefix() + config.colorize("&cO'yinchi &e" + finalName + " &cmute qilinmagan yoki topilmadi!"));
-            }
-        });
-
+            }));
         return true;
     }
 

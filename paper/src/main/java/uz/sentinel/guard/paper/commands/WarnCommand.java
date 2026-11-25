@@ -36,14 +36,8 @@ public class WarnCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(config.getPrefix() + config.colorize("&cSintaksis: &f/unwarn <o'yinchi> <warn_id|all>"));
                 return true;
             }
-            String targetName = args[0];
             String idOrAll = args[1];
-            UUID targetUuid = plugin.getAltManager().getUuidByName(targetName);
-            if (targetUuid == null) {
-                OfflinePlayer op = Bukkit.getOfflinePlayer(targetName);
-                if (op != null) targetUuid = op.getUniqueId();
-            }
-            UUID finalTarget = targetUuid;
+            uz.sentinel.guard.paper.util.Targets.resolve(plugin, sender, args[0], (finalTarget, targetName) ->
             plugin.getPunishmentManager().refreshHistory(finalTarget, () ->
                 plugin.getPunishmentManager().unwarn(finalTarget, idOrAll, sender, removed -> {
                     if (removed > 0) {
@@ -51,7 +45,7 @@ public class WarnCommand implements CommandExecutor, TabCompleter {
                     } else {
                         sender.sendMessage(config.getPrefix() + config.colorize("&cOgohlantirish topilmadi!"));
                     }
-                }));
+                })));
             return true;
         }
 
@@ -64,17 +58,11 @@ public class WarnCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(config.getPrefix() + config.colorize("&cSintaksis: &f/warnings <o'yinchi>"));
                 return true;
             }
-            String targetName = args[0];
-            UUID targetUuid = plugin.getAltManager().getUuidByName(targetName);
-            if (targetUuid == null) {
-                OfflinePlayer op = Bukkit.getOfflinePlayer(targetName);
-                if (op != null) targetUuid = op.getUniqueId();
-            }
-            UUID finalTarget = targetUuid;
+            uz.sentinel.guard.paper.util.Targets.resolve(plugin, sender, args[0], (finalTarget, targetName) ->
             plugin.getPunishmentManager().refreshHistory(finalTarget, () -> {
                 int activeWarns = plugin.getPunishmentManager().getActiveWarnsCount(finalTarget);
                 sender.sendMessage(config.getPrefix() + config.colorize("&e" + targetName + " &7o'yinchisining faol ogohlantirishlari: &c" + activeWarns + " ta"));
-            });
+            }));
             return true;
         }
 
@@ -102,40 +90,28 @@ public class WarnCommand implements CommandExecutor, TabCompleter {
         }
 
         String reason = reasonTokens.isEmpty() ? "Qoidabuzarlik" : String.join(" ", reasonTokens).trim();
-        UUID targetUuid = plugin.getAltManager().getUuidByName(targetName);
-        OfflinePlayer op = Bukkit.getOfflinePlayer(targetName);
-        if (targetUuid == null && op != null) {
-            targetUuid = op.getUniqueId();
-            if (op.getName() != null) targetName = op.getName();
-        }
-
-        if (plugin.isImmune(sender, targetUuid)) {
-            sender.sendMessage(config.getMessage("cannot-target-staff"));
-            return true;
-        }
-
-        if (sender instanceof Player && targetUuid != null && ((Player) sender).getUniqueId().equals(targetUuid)) {
-            sender.sendMessage(config.getPrefix() + config.colorize("&cSiz o'zingizni ogohlantira olmaysiz!"));
-            return true;
-        }
-
-        if (targetUuid == null) {
-            sender.sendMessage(config.getMessage("player-not-found"));
-            return true;
-        }
-        String ip = plugin.getAltManager().getLatestIp(targetUuid);
-        UUID finalTarget = targetUuid;
-        plugin.getPunishmentManager().createPunishment(
-                PunishmentType.WARN, targetUuid, targetName, ip, sender, reason, 0, silent, record -> {
-            plugin.getPunishmentFormatter().broadcastPunishment(record);
-            Player targetOnline = Bukkit.getPlayer(finalTarget);
-            if (targetOnline != null && targetOnline.isOnline()) {
-                int total = plugin.getPunishmentManager().getActiveWarnsCount(finalTarget);
-                targetOnline.sendMessage(config.getPrefix() + config.colorize("&c&lDIQQAT! &fSizga ogohlantirish berildi! &7(Jami: &e" + total + "&7)"));
-                targetOnline.sendMessage(config.colorize("&7Sabab: &e" + record.getReason()));
+        boolean finalSilent = silent;
+        uz.sentinel.guard.paper.util.Targets.resolve(plugin, sender, targetName, (targetUuid, shownName) -> {
+            if (plugin.isImmune(sender, targetUuid)) {
+                sender.sendMessage(config.getMessage("cannot-target-staff"));
+                return;
             }
+            if (sender instanceof Player && ((Player) sender).getUniqueId().equals(targetUuid)) {
+                sender.sendMessage(config.getPrefix() + config.colorize("&cSiz o'zingizni ogohlantira olmaysiz!"));
+                return;
+            }
+            String ip = plugin.getAltManager().getLatestIp(targetUuid);
+            plugin.getPunishmentManager().createPunishment(
+                    PunishmentType.WARN, targetUuid, shownName, ip, sender, reason, 0, finalSilent, record -> {
+                plugin.getPunishmentFormatter().broadcastPunishment(record);
+                Player targetOnline = Bukkit.getPlayer(targetUuid);
+                if (targetOnline != null && targetOnline.isOnline()) {
+                    int total = plugin.getPunishmentManager().getActiveWarnsCount(targetUuid);
+                    targetOnline.sendMessage(config.getPrefix() + config.colorize("&c&lDIQQAT! &fSizga ogohlantirish berildi! &7(Jami: &e" + total + "&7)"));
+                    targetOnline.sendMessage(config.colorize("&7Sabab: &e" + record.getReason()));
+                }
+            });
         });
-
         return true;
     }
 

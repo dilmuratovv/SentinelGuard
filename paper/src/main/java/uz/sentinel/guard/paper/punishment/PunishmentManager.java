@@ -130,7 +130,8 @@ public class PunishmentManager {
                                  Consumer<PunishmentRecord> onCommitted) {
         UUID punisherUuid = (punisher instanceof Player) ? ((Player) punisher).getUniqueId() : null;
         String punisherName = (punisher != null) ? punisher.getName() : "Console";
-        String cleanIp = IpAddresses.normalize(targetIp);
+        // An IPv6 IP ban covers the subscriber's /64; other records keep the exact address.
+        String cleanIp = type == PunishmentType.IP_BAN ? IpAddresses.network(targetIp) : IpAddresses.normalize(targetIp);
         String cleanReason = (reason != null && !reason.trim().isEmpty()) ? reason.trim() : "Qoidabuzarlik";
         NetworkService service = network;
         if (service == null && networkUnavailable) { fail(punisher); return; }
@@ -344,7 +345,7 @@ public class PunishmentManager {
         for (Player p : Bukkit.getOnlinePlayers()) {
             boolean account = p.getUniqueId().equals(record.getTargetUuid());
             boolean address = record.getType() == PunishmentType.IP_BAN && record.getTargetIp() != null
-                    && record.getTargetIp().equals(DataFiles.ip(p));
+                    && IpAddresses.sameNetwork(record.getTargetIp(), DataFiles.ip(p));
             if (account || address) p.kickPlayer(screen);
         }
     }
@@ -364,7 +365,7 @@ public class PunishmentManager {
                 activeBansByUuid.put(record.getTargetUuid(), record);
             } else if (record.getType() == PunishmentType.IP_BAN) {
                 if (record.getTargetIp() != null) {
-                    activeBansByIp.put(record.getTargetIp(), record);
+                    activeBansByIp.put(IpAddresses.network(record.getTargetIp()), record);
                 }
                 if (record.getTargetUuid() != null) {
                     activeBansByUuid.put(record.getTargetUuid(), record);
@@ -386,7 +387,7 @@ public class PunishmentManager {
             }
         }
         if (record.getTargetIp() != null && record.getType() == PunishmentType.IP_BAN) {
-            activeBansByIp.remove(record.getTargetIp(), record);
+            activeBansByIp.remove(IpAddresses.network(record.getTargetIp()), record);
         }
     }
 
@@ -470,8 +471,8 @@ public class PunishmentManager {
                 activeBansByUuid.remove(targetUuid, rec);
             }
         }
-        String cleanIp = IpAddresses.normalize(ip);
-        if (cleanIp != null) {
+        // the exact address (an old IPv6 ban) and its /64 network
+        for (String cleanIp : IpAddresses.banForms(ip)) {
             PunishmentRecord rec = activeBansByIp.get(cleanIp);
             if (rec != null) {
                 if (rec.isActive()) return rec;
@@ -605,7 +606,7 @@ public class PunishmentManager {
     private synchronized boolean unbanIpLocal(String cleanIp, String unpunisher, String reason) {
         boolean found = false;
         for (PunishmentRecord rec : punishmentsById.values()) {
-            if (rec.isActive() && rec.getType() == PunishmentType.IP_BAN && cleanIp.equals(rec.getTargetIp())) {
+            if (rec.isActive() && rec.getType() == PunishmentType.IP_BAN && IpAddresses.sameNetwork(cleanIp, rec.getTargetIp())) {
                 deindexPunishment(rec, unpunisher, reason);
                 found = true;
             }
@@ -811,6 +812,11 @@ public class PunishmentManager {
                 .filter(rec -> staffName.equalsIgnoreCase(rec.getPunisherName()))
                 .sorted((a, b) -> Long.compare(b.getStartTime(), a.getStartTime()))
                 .collect(Collectors.toList());
+    }
+
+    /** Every record held here (all of them standalone, the cached ones in network mode). */
+    public java.util.Collection<PunishmentRecord> getAllRecords() {
+        return java.util.Collections.unmodifiableCollection(punishmentsById.values());
     }
 
     public PunishmentRecord getRecordById(String id) {

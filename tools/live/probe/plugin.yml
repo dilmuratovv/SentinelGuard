@@ -1,0 +1,8 @@
+name: GuardProbe
+version: '1.0'
+main: uz.sentinel.guard.probe.GuardProbe
+api-version: '1.21'
+depend: [SentinelGuard]
+commands:
+  gp:
+    description: test probe (console only)

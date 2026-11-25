@@ -4,7 +4,9 @@ import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.event.EventTask;
 import com.velocitypowered.api.event.ResultedEvent.ComponentResult;
 import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.LoginEvent;
+import com.velocitypowered.api.event.player.KickedFromServerEvent;
 import com.velocitypowered.api.event.player.ServerPreConnectEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
@@ -34,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * IP), disconnects players as soon as a ban commits (outbox), and periodically re-checks everyone online.
  * Moderation commands run on the Paper servers; the proxy only enforces.
  */
-@Plugin(id="sentinelguard", name="SentinelGuard", version="2.2.0", authors={"azicoo"})
+@Plugin(id="sentinelguard", name="SentinelGuard", version="2.3.0", authors={"azicoo"})
 public final class SentinelGuardVelocity {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC);
     private final ProxyServer proxy;
@@ -49,6 +51,18 @@ public final class SentinelGuardVelocity {
     /** Velocity backend name -> Paper server-id; unlisted backends use their own name. */
     private final Map<String, String> serverIds = new ConcurrentHashMap<>();
     private volatile String unavailableMessage = "Moderation service unavailable. Please try later.";
+    // Frozen players (an active FREEZE row) cannot switch servers; leaving the network on purpose is banned here,
+    // because only the proxy can tell leaving from switching.
+    private volatile boolean freezeAutoBan = true;
+    private volatile long freezeBanDays = 30;
+    private volatile String freezeBanReason = "Left during a screenshare check";
+    private volatile String freezeSwitchMessage = "You are frozen for a check and cannot change servers.";
+    private volatile long freezeGraceSeconds = 180;
+    private volatile String freezeNoReturnReason = "Left during a screenshare check and did not return";
+    private volatile boolean stopping;
+    /** Last backend kick per player: a forced move to a fallback server is not a switch, a stopped server not a leave. */
+    private record BackendKick(long at, RegisteredServer server) {}
+    private final Map<UUID, BackendKick> backendKicks = new ConcurrentHashMap<>();
     private HikariDataSource pool;
     private ScheduledTask poll, reconcile, retry;
 
@@ -84,6 +98,15 @@ public final class SentinelGuardVelocity {
                     # found through the database. If a Velocity server name differs from the Paper
                     # network.server-id, map it: server.<velocity-name>=<paper-server-id>
                     #server.lobby=lobby-1
+                    # A frozen player who leaves the network and does not return within the grace period is banned
+                    # (a kick by staff through Guard and a proxy stop never ban). Frozen players cannot switch servers.
+                    freezeAutoBanOnLeave=true
+                    freezeAutoBanDays=30
+                    freezeAutoBanReason=Left during a screenshare check
+                    # seconds a frozen player has to come back (frozen again) before the ban; 0 = ban at once
+                    freezeReturnGraceSeconds=180
+                    freezeNoReturnReason=Left during a screenshare check and did not return
+                    freezeSwitchMessage=You are frozen for a check and cannot change servers.
                     """);
                 logger.error("Configure {} and restart. Logins are denied until the database is reachable.", file);
                 return false;
@@ -96,6 +119,12 @@ public final class SentinelGuardVelocity {
                 if (key.startsWith("server.") && key.length() > 7) serverIds.put(key.substring(7), properties.getProperty(key).trim());
             }
             unavailableMessage = properties.getProperty("unavailableMessage", unavailableMessage);
+            freezeAutoBan = Boolean.parseBoolean(properties.getProperty("freezeAutoBanOnLeave", "true"));
+            freezeBanDays = Math.max(0, Long.parseLong(properties.getProperty("freezeAutoBanDays", "30").trim()));
+            freezeBanReason = properties.getProperty("freezeAutoBanReason", freezeBanReason);
+            freezeSwitchMessage = properties.getProperty("freezeSwitchMessage", freezeSwitchMessage);
+            freezeGraceSeconds = Math.max(0, Long.parseLong(properties.getProperty("freezeReturnGraceSeconds", "180").trim()));
+            freezeNoReturnReason = properties.getProperty("freezeNoReturnReason", freezeNoReturnReason);
             HikariConfig config = new HikariConfig();
             config.setPoolName("SentinelGuard-proxy");
             config.setDriverClassName("org.mariadb.jdbc.Driver"); // relocated by the shade plugin
@@ -156,8 +185,24 @@ public final class SentinelGuardVelocity {
         return EventTask.async(() -> {
             JdbcPunishmentStore current = store;
             Optional<RegisteredServer> target = event.getResult().getServer();
-            if (current == null || target.isEmpty() || !enforcesBans(target.get())) return;
+            if (current == null || target.isEmpty()) return;
             Player player = event.getPlayer();
+            BackendKick kick = backendKicks.get(player.getUniqueId());
+            boolean forcedMove = kick != null && System.currentTimeMillis() - kick.at() < 10_000;
+            if (event.getPreviousServer() != null && !forcedMove) {
+                try {
+                    if (frozen(current, player.getUniqueId())) {
+                        event.setResult(ServerPreConnectEvent.ServerResult.denied());
+                        player.sendMessage(Component.text(freezeSwitchMessage, NamedTextColor.RED));
+                        return;
+                    }
+                } catch (Exception e) {
+                    logger.warn("Could not check freeze state; server switch refused", e);
+                    event.setResult(ServerPreConnectEvent.ServerResult.denied());
+                    return;
+                }
+            }
+            if (!enforcesBans(target.get())) return;
             List<NetworkPunishment> bans;
             try {
                 bans = current.activeBans(player.getUniqueId(), ip(player), Instant.now());
@@ -175,6 +220,81 @@ public final class SentinelGuardVelocity {
             }
             deny(event, player, screen(bans.get(0)));
         });
+    }
+
+    private static boolean frozen(JdbcPunishmentStore store, UUID player) throws Exception {
+        Instant now = Instant.now();
+        for (NetworkPunishment p : store.active(player, now)) if (p.type() == NetworkPunishment.Type.FREEZE && p.activeAt(now)) return true;
+        return false;
+    }
+
+    /**
+     * A frozen player who leaves the network must be back within the grace period (frozen again by the backend from
+     * the network freeze row) or is banned. The proxy cannot tell a quit from a lost connection, and a cheat client
+     * can fake either, so both get the same deadline; a kick issued by staff through Guard (a KICK row written just
+     * before) and a proxy shutdown never ban.
+     */
+    @Subscribe public void kickedFromServer(KickedFromServerEvent event) {
+        backendKicks.put(event.getPlayer().getUniqueId(), new BackendKick(System.currentTimeMillis(), event.getServer()));
+    }
+
+    @Subscribe public void disconnect(DisconnectEvent event) {
+        Player player = event.getPlayer();
+        BackendKick kick = backendKicks.remove(player.getUniqueId());
+        if (stopping || !freezeAutoBan || event.getLoginStatus() != DisconnectEvent.LoginStatus.SUCCESSFUL_LOGIN) return;
+        UUID uuid = player.getUniqueId();
+        String name = player.getUsername(), address = ip(player);
+        long left = System.currentTimeMillis();
+        proxy.getScheduler().buildTask(this, () -> {
+            JdbcPunishmentStore current = store;
+            if (current == null) return;
+            try {
+                if (!frozen(current, uuid)) return;
+                if (staffKickedSince(current, uuid, left - 15_000)) {
+                    logger.info("{} was kicked by staff while frozen: no ban.", name);
+                    return;
+                }
+                if (kick != null && left - kick.at() < 10_000 && !reachable(kick.server())) {
+                    logger.info("{} lost their server ({} is down) while frozen: no ban; the freeze stays.", name, kick.server().getServerInfo().getName());
+                    return;
+                }
+                logger.info("{} left the network while frozen; waiting {} s for a return.", name, freezeGraceSeconds);
+                proxy.getScheduler().buildTask(this, () -> banIfGone(uuid, name, address)).delay(Duration.ofSeconds(freezeGraceSeconds)).schedule();
+            } catch (Exception e) {
+                logger.warn("Could not check the freeze of " + name + " after leaving", e);
+            }
+        }).delay(Duration.ofSeconds(3)).schedule(); // a staff kick's KICK row is written alongside the kick
+    }
+
+    private void banIfGone(UUID uuid, String name, String address) {
+        JdbcPunishmentStore current = store;
+        if (current == null || stopping || proxy.getPlayer(uuid).isPresent()) return;
+        try {
+            Instant now = Instant.now();
+            if (!frozen(current, uuid) || !current.activeBans(uuid, address, now).isEmpty()) return;
+            String reason = freezeGraceSeconds == 0 ? freezeBanReason : freezeNoReturnReason;
+            current.create(new NetworkPunishment(UUID.randomUUID(), uuid, name, address, NetworkPunishment.Type.BAN, reason,
+                    null, "SentinelGuard", "proxy", now, freezeBanDays == 0 ? null : now.plus(Duration.ofDays(freezeBanDays)), false, null));
+            logger.info("{} left the network while frozen and did not return: banned ({}).", name, reason);
+        } catch (Exception e) {
+            logger.warn("Could not ban " + name + " for leaving while frozen", e);
+        }
+    }
+
+    private static boolean reachable(RegisteredServer server) {
+        try {
+            server.ping().get(3, java.util.concurrent.TimeUnit.SECONDS);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static boolean staffKickedSince(JdbcPunishmentStore store, UUID player, long sinceMs) throws Exception {
+        for (NetworkPunishment p : store.history(player, 5)) {
+            if (p.type() == NetworkPunishment.Type.KICK && p.createdAt().toEpochMilli() >= sinceMs) return true;
+        }
+        return false;
     }
 
     private void deny(ServerPreConnectEvent event, Player player, Component message) {
@@ -262,7 +382,7 @@ public final class SentinelGuardVelocity {
         if (p.type() != NetworkPunishment.Type.BAN && p.type() != NetworkPunishment.Type.IP_BAN) return;
         for (Player player : proxy.getAllPlayers()) {
             boolean account = player.getUniqueId().equals(p.player());
-            boolean address = p.type() == NetworkPunishment.Type.IP_BAN && p.ip() != null && p.ip().equals(ip(player));
+            boolean address = p.type() == NetworkPunishment.Type.IP_BAN && p.ip() != null && IpAddresses.sameNetwork(p.ip(), ip(player));
             if (!account && !address) continue;
             // A player already on a ban-exempt server stays; only enforcing servers (or limbo) lose them.
             boolean exempt = player.getCurrentServer().map(connection -> !enforcesBans(connection.getServer())).orElse(false);
@@ -304,6 +424,7 @@ public final class SentinelGuardVelocity {
     }
 
     @Subscribe public void shutdown(ProxyShutdownEvent event) {
+        stopping = true;
         store = null;
         if (retry != null) retry.cancel();
         if (poll != null) poll.cancel();

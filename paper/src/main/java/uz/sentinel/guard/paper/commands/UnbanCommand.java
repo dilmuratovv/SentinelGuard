@@ -33,36 +33,22 @@ public class UnbanCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        String targetName = args[0];
         boolean silent = false;
         List<String> reasonTokens = new ArrayList<>();
-
         for (int i = 1; i < args.length; i++) {
-            if (args[i].equalsIgnoreCase("-s") || args[i].equalsIgnoreCase("--silent")) {
-                silent = true;
-            } else {
-                reasonTokens.add(args[i]);
-            }
+            if (args[i].equalsIgnoreCase("-s") || args[i].equalsIgnoreCase("--silent")) silent = true;
+            else reasonTokens.add(args[i]);
         }
-
         String reason = reasonTokens.isEmpty() ? "Bekor qilindi" : String.join(" ", reasonTokens).trim();
-        UUID targetUuid = plugin.getAltManager().getUuidByName(targetName);
-        OfflinePlayer op = Bukkit.getOfflinePlayer(targetName);
-        if (targetUuid == null && op != null) {
-            targetUuid = op.getUniqueId();
-            if (op.getName() != null) targetName = op.getName();
-        }
-
-        String finalName = targetName;
         boolean finalSilent = silent;
-        plugin.getPunishmentManager().unban(targetUuid, sender, reason, finalSilent, success -> {
-            if (success) {
-                plugin.getPunishmentFormatter().broadcastUnpunish(PunishmentType.BAN, finalName, sender.getName(), reason, finalSilent);
-            } else {
-                sender.sendMessage(config.getPrefix() + config.colorize("&cO'yinchi &e" + finalName + " &cbanlanmagan yoki topilmadi!"));
-            }
-        });
-
+        uz.sentinel.guard.paper.util.Targets.resolve(plugin, sender, args[0], (targetUuid, finalName) ->
+            plugin.getPunishmentManager().unban(targetUuid, sender, reason, finalSilent, success -> {
+                if (success) {
+                    plugin.getPunishmentFormatter().broadcastUnpunish(PunishmentType.BAN, finalName, sender.getName(), reason, finalSilent);
+                } else {
+                    sender.sendMessage(config.getPrefix() + config.colorize("&cO'yinchi &e" + finalName + " &cbanlanmagan yoki topilmadi!"));
+                }
+            }));
         return true;
     }
 

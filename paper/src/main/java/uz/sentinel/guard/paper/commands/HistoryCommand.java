@@ -37,21 +37,8 @@ public class HistoryCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        String targetName = args[0];
-        UUID targetUuid = plugin.getAltManager().getUuidByName(targetName);
-        OfflinePlayer op = Bukkit.getOfflinePlayer(targetName);
-        if (targetUuid == null && op != null) {
-            targetUuid = op.getUniqueId();
-            if (op.getName() != null) targetName = op.getName();
-        }
-
-        if (targetUuid == null) {
-            targetUuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + targetName).getBytes());
-        }
-
-        UUID finalTarget = targetUuid;
-        String finalName = targetName;
-        plugin.getPunishmentManager().refreshHistory(finalTarget, () -> show(sender, finalTarget, finalName));
+        uz.sentinel.guard.paper.util.Targets.resolve(plugin, sender, args[0], (finalTarget, finalName) ->
+            plugin.getPunishmentManager().refreshHistory(finalTarget, () -> show(sender, finalTarget, finalName)));
         return true;
     }
 

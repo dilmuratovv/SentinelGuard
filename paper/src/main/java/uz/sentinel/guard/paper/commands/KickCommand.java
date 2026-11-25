@@ -89,6 +89,7 @@ public class KickCommand implements CommandExecutor, TabCompleter {
         plugin.getPunishmentManager().createPunishment(
                 PunishmentType.KICK, targetPlayer.getUniqueId(), targetPlayer.getName(), ip, sender, reason, 0, silent,
                 record -> plugin.getPunishmentFormatter().broadcastPunishment(record));
+        plugin.getFreezeManager().markStaffKick(targetPlayer.getUniqueId());
         targetPlayer.kickPlayer(config.colorize("&c" + reason));
 
         return true;

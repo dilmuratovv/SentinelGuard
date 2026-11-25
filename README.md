@@ -46,11 +46,12 @@ Together: SentinelGuard adds the findings of SentinelAC, SentinelAD and Sentinel
 
 | Area | What SentinelGuard provides |
 |---|---|
-| **Punishments** | Ban, IP ban (IPv4 and IPv6), mute, warn, kick and their reversals, with durations, reasons and silent (`-s`) mode. |
+| **Punishments** | Ban, IP ban (IPv4, and IPv6 by /64 network), mute, warn, kick and their reversals, with durations, reasons and silent (`-s`) mode. A mistyped duration is rejected, never turned into a permanent ban. |
 | **History** | `/history` GUI, `/staffhistory`, warnings list, and a control GUI for each player. |
-| **Alt detection** | Every IP a player used is stored, so `/alts` and join alerts see accounts from all servers. |
-| **Suspicious list** | `/sus` GUI with reasons and history; optionally fed by SentinelAC, SentinelAD and SentinelAX-ray flags. |
-| **Freeze** | `/freeze` blocks movement and chat; a frozen player stays frozen after joining another server. |
+| **Alt detection** | Every IP a player used is stored, so `/alts` and join alerts see accounts from all servers. Shared addresses (carrier NAT, schools, VPNs) do not link unrelated players, and an IP ban on one needs `-f`. |
+| **Suspicious list** | `/sus` GUI with reasons and history; optionally fed by SentinelAC (a threshold per check: one KillAura flag counts, movement checks need a burst), SentinelAD and SentinelAX-ray flags. |
+| **Freeze** | `/freeze` blocks movement, chat, vehicles, pearls, portals and gliding. Quitting is an instant ban; a lost connection or a non-staff kick must be followed by a return within a grace period, or it is a ban. On a network the proxy enforces it and refuses server switches. |
+| **Mute** | Chat, private messages, party/clan/faction/channel chats of common plugins, signs, books and anvil renames. |
 | **Staff chat** | `/staffchat` on one server; network-wide when Redis is enabled. |
 | **Shared database** | Punishments, player names and UUIDs, IPs, `/sus`, freeze and kick live in one MariaDB. |
 | **Proxy enforcement** | The Velocity plugin denies banned logins and disconnects online players about a second after a ban. |
@@ -117,8 +118,8 @@ Put the password in the URI and keep Redis off public networks.
 ### Good to know
 
 - **Keep server clocks synchronized (NTP).** Temporary bans and mutes can end a few seconds early or late if server clocks differ.
-- **Immunity:** `guard.admin.bypass` is checked on the server where the target is online. A target on another server is only protected if they are an operator, so give ban commands only to people you trust.
-- **Unknown players:** a name that has never joined any server running SentinelGuard falls back to Bukkit's lookup (Mojang in online mode, an offline UUID otherwise).
+- **Immunity:** staff (`guard.admin.bypass`, `guard.admin`, `guard.staff`, `sus.admin` or operator) cannot be punished by other staff, also while offline: everyone seen with one of these permissions is remembered (`staff.txt`, shared through the database in network mode), and LuckPerms is asked directly when installed.
+- **Unknown players:** a name that has never joined any server running SentinelGuard is looked up off the main thread (Mojang in online or proxy online mode, an offline UUID otherwise); a name Mojang does not know is reported as not found.
 - **Old data:** the database cleans up old internal records automatically (`network.outbox-retention-days`, default 7).
 
 ## Commands
@@ -140,7 +141,7 @@ Put the password in the URI and keep Redis off public networks.
 | `/alts <player\|ip>` | Alternate accounts. | `guard.alts` |
 | `/staffchat <message>` | Staff chat. | `guard.staffchat` |
 | `/sus [reload]` · `/addsus <player> <reason>` · `/clearsus` | Suspicious players list. | `sus.admin` |
-| `/freeze <player>` · `/unfreeze <player>` | Freeze a player. | `sus.admin` |
+| `/freeze <player>` · `/unfreeze <player>` | Freeze a player; unfreeze also works while they are offline. | `sus.admin` |
 | `/sgproxy` (Velocity) | Proxy connection status. | `sentinelguard.proxy.admin` |
 
 ## Compatibility

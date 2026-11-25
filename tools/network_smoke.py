@@ -185,6 +185,7 @@ def main():
     parser.add_argument('--velocity-jar', type=Path)
     parser.add_argument('--velocity-version', default='4.3.1')
     parser.add_argument('--sentinelac-jar', type=Path, help='optional: installed on server a only')
+    parser.add_argument('--probe-jar', type=Path, help='optional: tools/live GuardProbe, installed on server b for the shared staff check')
     args = parser.parse_args()
     if not args.accept_eula:
         parser.error('Accept the Minecraft EULA to run isolated test servers')
@@ -239,6 +240,8 @@ def main():
                 raise RuntimeError(server_id + ' first boot failed')
             (folder / 'plugins/SentinelGuard').mkdir(parents=True, exist_ok=True)
             shutil.copy2(paper_plugin, folder / 'plugins' / paper_plugin.name)
+            if args.probe_jar and server_id == 'b':
+                shutil.copy2(args.probe_jar, folder / 'plugins' / args.probe_jar.name)
             if args.sentinelac_jar and server_id == 'a':
                 shutil.copy2(args.sentinelac_jar, folder / 'plugins' / args.sentinelac_jar.name)
             global_config = folder / 'config/paper-global.yml'
@@ -293,7 +296,7 @@ def main():
         (proxy_dir / 'forwarding.secret').write_text(secret)
         (proxy_dir / 'plugins/sentinelguard/database.properties').write_text(
             f'jdbcUrl={args.jdbc_url}\nusername={args.db_user}\npassword={args.db_password}\n'
-            'denyLoginOnDatabaseError=true\npollIntervalMs=500\nreconcileIntervalSeconds=10\n')
+            'denyLoginOnDatabaseError=true\npollIntervalMs=500\nreconcileIntervalSeconds=10\nfreezeReturnGraceSeconds=8\n')
 
         a = Proc('a', [args.java, '-Xmx640M', '-jar', str(paper), '--nogui'], work / 'a'); procs.append(a)
         a.wait_for(r"Network database connected as server 'a'", 240)
@@ -444,6 +447,107 @@ def main():
         end_chat(freeze)
         check('freeze and unfreeze issued on server b act on a player on server a')
 
+        # --- a freeze is enforced by the proxy: no server switch, leaving and not returning is banned ---
+        def active_bans(name):
+            return int(query(args, f"SELECT COUNT(*) FROM sg_punishments WHERE player_name='{name}' AND kind='BAN' AND revoked=FALSE")[0][0])
+
+        def online_on(proc, name):
+            proc.command('list')
+            line = proc.wait_for(r'There (?:is|are) \d+ (?:of a max of|out of maximum) \d+ players online:(.*)', 20)
+            return name in line.group(1)
+
+        sw = hold_chat(proxy_port, 'FreezeSwitch', client_version)
+        held.append(sw)
+        a.wait_for(r'FreezeSwitch', 30)
+        time.sleep(1.5)
+        b.command('freeze FreezeSwitch')
+        time.sleep(2)
+        say(sw, '/server b')
+        time.sleep(4)
+        if online_on(b, 'FreezeSwitch') or not online_on(a, 'FreezeSwitch'):
+            raise RuntimeError('a frozen player switched servers')
+        b.command('unfreeze FreezeSwitch')
+        time.sleep(2)
+        say(sw, '/server b')
+        time.sleep(4)
+        if not online_on(b, 'FreezeSwitch'):
+            raise RuntimeError('an unfrozen player could not switch servers (control)')
+        end_chat(sw)
+        check('a frozen player cannot switch servers; once unfrozen they can')
+
+        leaver = hold_chat(proxy_port, 'FreezeLeave', client_version)
+        held.append(leaver)
+        a.wait_for(r'FreezeLeave', 30)
+        time.sleep(1.5)
+        b.command('freeze FreezeLeave')
+        time.sleep(2)
+        end_chat(leaver)
+        time.sleep(5)
+        if active_bans('FreezeLeave') != 0:
+            raise RuntimeError('banned before the return deadline')
+        proxy.wait_for(r'FreezeLeave left the network while frozen and did not return: banned', 30)
+        client(proxy_port, 'FreezeLeave', client_version, 'kick:did not return')
+        check('a frozen player who leaves the network and stays away is banned by the proxy after the grace period')
+
+        back = hold_chat(proxy_port, 'FreezeBack', client_version)
+        held.append(back)
+        a.wait_for(r'FreezeBack', 30)
+        time.sleep(1.5)
+        b.command('freeze FreezeBack')
+        time.sleep(2)
+        end_chat(back)
+        time.sleep(2)
+        back = hold_chat(proxy_port, 'FreezeBack', client_version)
+        held.append(back)
+        time.sleep(2)
+        if stat(a, 'sg info', r"Muzlatilganlar: (\d+) ta") != 1:
+            raise RuntimeError('a returning frozen player was not frozen again')
+        time.sleep(12)
+        if active_bans('FreezeBack') != 0:
+            raise RuntimeError('a frozen player who came back in time was banned')
+        b.command('unfreeze FreezeBack')
+        time.sleep(1.5)
+        end_chat(back)
+        check('a frozen player who returns within the grace period is frozen again and not banned')
+
+        kicked = hold_client(proxy_port, 'FreezeKick', client_version, 'join-then-kick:go-discord')
+        held.append(kicked)
+        a.wait_for(r'FreezeKick', 30)
+        time.sleep(1.5)
+        b.command('freeze FreezeKick')
+        time.sleep(2)
+        b.command('kick FreezeKick go-discord')
+        kicked.communicate(timeout=40)
+        time.sleep(15)
+        if active_bans('FreezeKick') != 0:
+            raise RuntimeError('a staff kick of a frozen player led to a ban')
+        b.command('unfreeze FreezeKick')
+        check('a staff kick of a frozen player never bans')
+
+        # --- staff seen on server a are protected while offline on server b too ---
+        a.command('op NetMod')
+        mod = hold_chat(proxy_port, 'NetMod', client_version)
+        held.append(mod)
+        a.wait_for(r'NetMod', 30)
+        time.sleep(1.5)
+        end_chat(mod)
+        a.command('deop NetMod')
+        time.sleep(1.5)
+        if not query(args, f"SELECT 1 FROM sg_staff WHERE player_uuid='{offline_uuid('NetMod')}'"):
+            raise RuntimeError('staff seen on server a was not written to sg_staff')
+        if args.probe_jar:
+            deadline = time.monotonic() + 75
+            while True:
+                b.command('gp staff NetMod')
+                if 'immune=true' in b.wait_for(r'GP staff NetMod immune=\w+', 20).group(0):
+                    break
+                if time.monotonic() > deadline:
+                    raise RuntimeError('server b does not protect staff seen on server a')
+                time.sleep(5)
+            check('staff seen on server a are protected while offline on server b (shared staff list)')
+        else:
+            check('staff seen on server a are recorded in the shared staff list')
+
         b.command('sg status')
         b.wait_for(r'Tarmoq \(MariaDB\)', 10)
         proxy.command('sgproxy')
@@ -459,6 +563,29 @@ def main():
         a.wait_for(r'qayta yuklandi', 20)
         client(proxy_port, 'BanProbe', client_version, 'join')
         check('reload keeps network mode working')
+
+        # a frozen player whose server stops is moved to the fallback server (not a switch) and stays frozen there
+        down = hold_chat(proxy_port, 'FreezeDown', client_version)
+        held.append(down)
+        a.wait_for(r'FreezeDown', 30)
+        time.sleep(1.5)
+        say(down, '/server b')
+        b.wait_for(r'FreezeDown', 30)
+        time.sleep(2)
+        a.command('freeze FreezeDown')
+        time.sleep(2)
+        if b.stop('stop', 90) != 0:
+            raise RuntimeError('b exited with an error')
+        a.wait_for(r'FreezeDown (?:joined the game|\[)', 40)
+        time.sleep(2)
+        if stat(a, 'sg info', r"Muzlatilganlar: (\d+) ta") != 1:
+            raise RuntimeError('a frozen player moved off a stopped server was not frozen on the fallback server')
+        a.command('unfreeze FreezeDown')
+        time.sleep(1.5)
+        end_chat(down)
+        if int(query(args, "SELECT COUNT(*) FROM sg_punishments WHERE player_name='FreezeDown' AND kind='BAN'")[0][0]) != 0:
+            raise RuntimeError('a frozen player whose server stopped was banned')
+        check('a frozen player on a stopping server is moved to the fallback, frozen there and not banned')
 
         for name, proc, cmd in (('a', a, 'stop'), ('b', b, 'stop'), ('proxy', proxy, 'shutdown')):
             code = proc.stop(cmd, 90)
@@ -520,7 +647,7 @@ import java.sql.*;
 public class ResetDb { public static void main(String[] a) throws Exception {
   Class.forName("uz.sentinel.guard.libs.mariadb.Driver");
   try (Connection c = DriverManager.getConnection(a[0], a[1], a[2]); Statement s = c.createStatement()) {
-    for (String t : new String[]{"sg_outbox", "sg_punishments", "sg_schema", "sg_players", "sg_player_ips", "sg_sus", "sg_sus_log"}) s.execute("DROP TABLE IF EXISTS " + t);
+    for (String t : new String[]{"sg_outbox", "sg_punishments", "sg_schema", "sg_players", "sg_player_ips", "sg_sus", "sg_sus_log", "sg_servers", "sg_staff"}) s.execute("DROP TABLE IF EXISTS " + t);
   }
 }}''')
     subprocess.run([args.java, '-cp', str(jar), str(source), args.jdbc_url,

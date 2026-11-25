@@ -47,10 +47,12 @@ public class FreezeCommand implements CommandExecutor, TabCompleter {
         if (online != null && online.isOnline()) {
             targetUuid = online.getUniqueId();
             targetName = online.getName();
-        } else if (plugin.getNetwork() != null) {
-            // The player may be on another server of the network.
-            targetUuid = plugin.getAltManager().getUuidByName(args[0]);
-            targetName = args[0];
+        } else if (plugin.getNetwork() != null || cmdName.equals("unfreeze")) {
+            // On a network the player may be on another server; standalone an offline player can still be released
+            // from a parked freeze (and its return deadline).
+            var known = uz.sentinel.guard.paper.util.Targets.known(plugin, args[0]);
+            targetUuid = known == null ? null : known.uuid();
+            targetName = known == null ? args[0] : known.name();
         } else {
             targetUuid = null;
             targetName = args[0];

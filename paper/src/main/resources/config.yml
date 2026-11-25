@@ -105,6 +105,16 @@ ban-screen-format:
   - "&bdiscord.gg/yourserver"
   - "&c&l━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# Commands a muted player cannot use. A built-in list always applies: private messages, /me, /say, /afk <message>,
+# party, clan, guild, faction, town, island and channel chats of common plugins, item renames and nicknames.
+# Namespaced forms such as /essentials:msg are covered too. Signs, books and anvil renames are blocked as well.
+# Add your own here; several words match a subcommand ("party chat"), "*" is any one word ("afk *").
+mute-blocked-commands: []
+#  - "mychat"
+#  - "kingdom chat"
+# Built-in entries to allow again, written exactly as in the built-in list (e.g. "g" if /g is not a chat on your server).
+mute-allowed-commands: []
+
 # Message sent to muted player attempting to chat
 mute-chat-blocked-message:
   - "&8&m----------------------------------------------------"
@@ -126,6 +136,16 @@ warn-settings:
 staff-chat-format: "&8[&cStaffChat&8] &b{staff}&8: &f{message}"
 alt-alert-format: "&8[&cALT-OGOHLANTIRISH&8] &e{player} &7o'yinchi banlangan &c{banned_player}&7 bilan bir xil IP orqali kirdi!"
 
+# Alt detection. IPv6 addresses are grouped by their /64 network (one home connection), IPv4 by the address.
+alts:
+  # An address used by this many accounts or more is treated as shared (mobile carrier NAT, school, cafe, VPN).
+  # 0 turns shared-address handling off.
+  shared-ip-accounts: 6
+  # Shared addresses do not link accounts in /alts and the GUI.
+  ignore-shared-ips: true
+  # Alt alerts on a shared address are noise; when true they are still sent, labelled as shared.
+  alert-on-shared-ips: false
+
 # Freeze System Settings
 freeze:
   title: "&c&lMUZLATILDINGIZ!"
@@ -134,6 +154,12 @@ freeze:
   auto-ban-on-leave: true
   auto-ban-duration-days: 30
   auto-ban-reason: "Tekshiruv (SS) paytida serverdan chiqish"
+  # A frozen player who quits is banned at once. One who loses connection, crashes or is kicked by an anticheat
+  # (all of which a cheat client can provoke on purpose) must come back within this many seconds, where they are
+  # frozen again, or is banned with the reason below. A kick by Guard's /kick and a server restart never ban.
+  # 0 = ban at once for those too. On a network (Velocity) the proxy applies the same rules.
+  return-grace-seconds: 180
+  auto-ban-reason-no-return: "Tekshiruv (SS) paytida chiqib, qaytmadi"
   message:
     - "&7============================================="
     - "&c&lDIQQAT! &fSiz tekshiruv uchun muzlatildingiz!"
@@ -356,7 +382,18 @@ integrations:
     sus-threshold: 1
   sentinelac:
     enabled: true
+    # Flags of one check inside a window that put a player on the sus list. Checks differ a lot: one KillAura or
+    # Backtrack flag is strong evidence, movement checks also fire on lag. Built-in defaults:
+    #   KillAura*, TrackingA, BacktrackA, AutoTotem*, CrystalAura*, AimModulo360, Baritone, FabricatedPlace,
+    #   Exploit*, Crash*: 1 in 10 min | AimDuplicateLook: 2/10 min | Hitboxes, AutoClicker*: 2/5 min | Reach: 3/5 min
+    #   AntiKB: 5/2 min | Chat*: 5/min | Phase, NoFall, GroundSpoof, Elytra*, Vehicle*, NoSlow: 10/min
+    #   Timer*, Sprint*: 15/min | Simulation: 25/min | anything else: sus-threshold / window-seconds.
     sus-threshold: 10
+    window-seconds: 60
+    # Override or add rules: "<check or prefix*>": "<flags>/<seconds>"
+    checks: {}
+    #  Reach: "2/300"
+    #  BadPackets*: "5/60"
 
 # ------------------------------------------------------ #
 # Network mode (Velocity + several Paper servers)

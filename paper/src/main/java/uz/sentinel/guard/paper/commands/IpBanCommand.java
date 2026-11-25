@@ -39,80 +39,59 @@ public class IpBanCommand implements CommandExecutor, TabCompleter {
         }
 
         String targetInput = args[0];
-        boolean silent = false;
-        List<String> remaining = new ArrayList<>();
-
-        for (int i = 1; i < args.length; i++) {
-            if (args[i].equalsIgnoreCase("-s") || args[i].equalsIgnoreCase("--silent")) {
-                silent = true;
-            } else {
-                remaining.add(args[i]);
-            }
+        PunishArgs parsed = PunishArgs.parse(args, 1, "IP-Ban qoidabuzarlik");
+        if (parsed.badDuration() != null) {
+            sender.sendMessage(config.getPrefix() + config.colorize(parsed.badDurationMessage()));
+            return true;
         }
+        boolean force = java.util.Arrays.stream(args).anyMatch(a -> a.equalsIgnoreCase("-f") || a.equalsIgnoreCase("--force"));
+        String reason = parsed.reason().replaceAll("(?i)(^|\\s)(-f|--force)(?=\\s|$)", " ").trim();
+        if (reason.isEmpty()) reason = "IP-Ban qoidabuzarlik";
+        String finalReason = reason;
 
-        long durationMs = -1;
-        String reason = "IP-Ban qoidabuzarlik";
-
-        if (!remaining.isEmpty()) {
-            String firstToken = remaining.get(0);
-            if (TimeParser.isDuration(firstToken)) {
-                durationMs = TimeParser.parseDuration(firstToken);
-                remaining.remove(0);
-            }
-            if (!remaining.isEmpty()) {
-                reason = String.join(" ", remaining).trim();
-            }
-        }
-
-        String ip = null;
-        UUID targetUuid = null;
-        String targetName = targetInput;
-
-        // Check if input is IP address
         if (IpAddresses.isIp(targetInput)) {
-            ip = IpAddresses.normalize(targetInput);
-        } else {
-            Player online = Bukkit.getPlayer(targetInput);
-            if (online != null && DataFiles.ip(online) != null) {
-                ip = DataFiles.ip(online);
-                targetUuid = online.getUniqueId();
-                targetName = online.getName();
-            } else {
-                targetUuid = plugin.getAltManager().getUuidByName(targetInput);
-                if (targetUuid == null) {
-                    OfflinePlayer op = Bukkit.getOfflinePlayer(targetInput);
-                    if (op != null) targetUuid = op.getUniqueId();
-                }
-                if (targetUuid != null) {
-                    ip = plugin.getAltManager().getLatestIp(targetUuid);
-                }
-            }
+            ipBan(sender, null, targetInput, IpAddresses.normalize(targetInput), parsed, finalReason, force);
+            return true;
         }
+        Player online = Bukkit.getPlayerExact(targetInput);
+        if (online != null && DataFiles.ip(online) != null) {
+            ipBan(sender, online.getUniqueId(), online.getName(), DataFiles.ip(online), parsed, finalReason, force);
+            return true;
+        }
+        uz.sentinel.guard.paper.util.Targets.resolve(plugin, sender, targetInput, (uuid, name) ->
+                ipBan(sender, uuid, name, plugin.getAltManager().getLatestIp(uuid), parsed, finalReason, force));
+        return true;
+    }
 
+    private void ipBan(CommandSender sender, UUID targetUuid, String targetName, String ip, PunishArgs parsed, String reason, boolean force) {
+        ConfigManager config = plugin.getConfigManager();
         if (targetUuid != null && plugin.isImmune(sender, targetUuid)) {
             sender.sendMessage(config.getMessage("cannot-target-staff"));
-            return true;
+            return;
         }
-
         if (ip == null || ip.isEmpty()) {
             sender.sendMessage(config.getPrefix() + config.colorize("&cO'yinchining IP manzili topilmadi!"));
-            return true;
+            return;
         }
-
+        // A shared address (CGNAT, school, cafe, VPN exit) carries many unrelated players: banning it bans them all.
+        int accounts = plugin.getAltManager().accountsOn(ip);
+        int sharedAt = plugin.getConfig().getInt("alts.shared-ip-accounts", 6);
+        if (!force && sharedAt > 0 && accounts >= sharedAt) {
+            sender.sendMessage(config.getPrefix() + config.colorize("&eDiqqat: &f" + ip + " &eumumiy IP ko'rinadi (&f" + accounts
+                    + " &eta akkaunt). IP-ban ularning hammasini bloklaydi. Baribir qilish uchun buyruq oxiriga &f-f &eqo'shing."));
+            return;
+        }
         UUID finalTarget = targetUuid;
         plugin.getPunishmentManager().createPunishment(
-                PunishmentType.IP_BAN, targetUuid, targetName, ip, sender, reason, durationMs, silent, record -> {
+                PunishmentType.IP_BAN, targetUuid, targetName, ip, sender, reason, parsed.durationMs(), parsed.silent(), record -> {
             plugin.getPunishmentFormatter().broadcastPunishment(record);
-            // Kick all online players with this IP and the targeted account
             String kickScreen = plugin.getPunishmentFormatter().buildBanScreen(record);
             for (Player p : plugin.getPunishmentManager().enforcesBans() ? Bukkit.getOnlinePlayers() : List.<Player>of()) {
-                if (p.getUniqueId().equals(finalTarget) || (record.getTargetIp() != null && record.getTargetIp().equals(DataFiles.ip(p)))) {
+                if (p.getUniqueId().equals(finalTarget) || IpAddresses.sameNetwork(record.getTargetIp(), DataFiles.ip(p))) {
                     p.kickPlayer(kickScreen);
                 }
             }
         });
-
-        return true;
     }
 
     @Override

@@ -25,7 +25,7 @@ public class AltManager {
     private final Map<UUID, String> latestIps = new ConcurrentHashMap<>(128);
     // UUID -> Set of known IPs
     private final Map<UUID, Set<String>> playerIps = new ConcurrentHashMap<>(128);
-    // IP -> Set of UUIDs
+    // IP network (IPv4 address, IPv6 /64) -> Set of UUIDs
     private final Map<String, Set<UUID>> ipPlayers = new ConcurrentHashMap<>(128);
     // UUID -> Name
     private final Map<UUID, String> playerNames = new ConcurrentHashMap<>(128);
@@ -70,7 +70,7 @@ public class AltManager {
         ips.addAll(p.ips());
         if (p.latestIp() != null) ips.add(p.latestIp());
         playerIps.put(p.uuid(), ips);
-        for (String ip : ips) ipPlayers.computeIfAbsent(ip, k -> ConcurrentHashMap.newKeySet(4)).add(p.uuid());
+        for (String ip : ips) link(ip, p.uuid());
     }
 
     /** A player record written by any server (read from the outbox). */
@@ -88,7 +88,7 @@ public class AltManager {
         String oldIp = latestIps.put(uuid, cleanIp);
 
         boolean added1 = playerIps.computeIfAbsent(uuid, k -> ConcurrentHashMap.newKeySet(4)).add(cleanIp);
-        boolean added2 = ipPlayers.computeIfAbsent(cleanIp, k -> ConcurrentHashMap.newKeySet(4)).add(uuid);
+        boolean added2 = link(cleanIp, uuid);
 
         boolean changed = added1 || added2 || oldIp == null || !oldIp.equals(cleanIp) || !name.equals(oldName);
         if (changed) {
@@ -100,14 +100,32 @@ public class AltManager {
         // Persisted by the periodic auto-save and on shutdown.
     }
 
+    private boolean link(String ip, UUID uuid) {
+        String key = IpAddresses.network(ip);
+        return key != null && ipPlayers.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet(4)).add(uuid);
+    }
+
+    /** How many accounts have used this address (its /64 for IPv6). */
+    public int accountsOn(String ip) {
+        String key = IpAddresses.network(ip);
+        Set<UUID> set = key == null ? null : ipPlayers.get(key);
+        return set == null ? 0 : set.size();
+    }
+
+    /** An address many unrelated accounts use (carrier-grade NAT, a school, a cafe, a VPN exit). */
+    public boolean isShared(String ip) {
+        int limit = plugin.getConfig().getInt("alts.shared-ip-accounts", 6);
+        return limit > 0 && accountsOn(ip) >= limit;
+    }
+
     public String getLatestIp(UUID uuid) {
         return latestIps.get(uuid);
     }
 
     public Set<UUID> getAltsByIp(String ip) {
         if (ip == null) return Collections.emptySet();
-        String cleanIp = IpAddresses.normalize(ip);
-        return ipPlayers.getOrDefault(cleanIp, Collections.emptySet());
+        String key = IpAddresses.network(ip);
+        return key == null ? Collections.emptySet() : ipPlayers.getOrDefault(key, Collections.emptySet());
     }
 
     public Set<UUID> getAltsByUuid(UUID uuid) {
@@ -116,8 +134,10 @@ public class AltManager {
             return Collections.emptySet();
         }
         Set<UUID> allAlts = new HashSet<>(4);
+        boolean skipShared = plugin.getConfig().getBoolean("alts.ignore-shared-ips", true);
         for (String ip : ips) {
-            Set<UUID> playersOnIp = ipPlayers.get(ip);
+            if (skipShared && isShared(ip)) continue; // everyone behind a carrier NAT is not an alt
+            Set<UUID> playersOnIp = ipPlayers.get(IpAddresses.network(ip));
             if (playersOnIp != null) {
                 allAlts.addAll(playersOnIp);
             }
@@ -176,9 +196,7 @@ public class AltManager {
                 }
                 playerIps.put(uuid, ipSet);
 
-                for (String ip : ipSet) {
-                    ipPlayers.computeIfAbsent(ip, k -> ConcurrentHashMap.newKeySet(4)).add(uuid);
-                }
+                for (String ip : ipSet) link(ip, uuid);
             } catch (Exception e) {
                 plugin.getLogger().log(Level.WARNING, "Could not load alt record for: " + uuidStr, e);
             }

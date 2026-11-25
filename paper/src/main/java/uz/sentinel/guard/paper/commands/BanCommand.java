@@ -39,67 +39,34 @@ public class BanCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        String targetName = args[0];
-        boolean silent = false;
-        List<String> remainingArgs = new ArrayList<>();
-
-        for (int i = 1; i < args.length; i++) {
-            if (args[i].equalsIgnoreCase("-s") || args[i].equalsIgnoreCase("--silent")) {
-                silent = true;
-            } else {
-                remainingArgs.add(args[i]);
-            }
-        }
-
-        long durationMs = -1; // Default: Permanent
-        String reason = "Qoidabuzarlik";
-
-        if (!remainingArgs.isEmpty()) {
-            String firstToken = remainingArgs.get(0);
-            if (TimeParser.isDuration(firstToken)) {
-                durationMs = TimeParser.parseDuration(firstToken);
-                remainingArgs.remove(0);
-            }
-            if (!remainingArgs.isEmpty()) {
-                reason = String.join(" ", remainingArgs).trim();
-            }
-        }
-
-        // Get target UUID
-        UUID targetUuid = plugin.getAltManager().getUuidByName(targetName);
-        OfflinePlayer op = Bukkit.getOfflinePlayer(targetName);
-        if (targetUuid == null && op != null && (op.hasPlayedBefore() || op.isOnline() || op.getName() != null)) {
-            targetUuid = op.getUniqueId();
-            if (op.getName() != null) targetName = op.getName();
-        } else if (targetUuid == null) {
-            targetUuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + targetName).getBytes());
-        }
-
-        // Prevent targeting immune staff/admin/bypass
-        if (plugin.isImmune(sender, targetUuid)) {
-            sender.sendMessage(config.getMessage("cannot-target-staff"));
+        PunishArgs parsed = PunishArgs.parse(args, 1, "Qoidabuzarlik");
+        if (parsed.badDuration() != null) {
+            sender.sendMessage(config.getPrefix() + config.colorize(parsed.badDurationMessage()));
             return true;
         }
-
-        if (sender instanceof Player && ((Player) sender).getUniqueId().equals(targetUuid)) {
-            sender.sendMessage(config.getPrefix() + config.colorize("&cSiz o'zingizni ban qila olmaysiz!"));
-            return true;
-        }
-
-        String ip = plugin.getAltManager().getLatestIp(targetUuid);
-        Player targetOnline = Bukkit.getPlayer(targetUuid);
-        if (targetOnline != null && targetOnline.isOnline() && targetOnline.getAddress() != null) {
-            ip = DataFiles.ip(targetOnline);
-        }
-
-        plugin.getPunishmentManager().createPunishment(
-                PunishmentType.BAN, targetUuid, targetName, ip, sender, reason, durationMs, silent, record -> {
-            plugin.getPunishmentFormatter().broadcastPunishment(record);
-            if (targetOnline != null && targetOnline.isOnline() && plugin.getPunishmentManager().enforcesBans()) {
-                targetOnline.kickPlayer(plugin.getPunishmentFormatter().buildBanScreen(record));
+        uz.sentinel.guard.paper.util.Targets.resolve(plugin, sender, args[0], (targetUuid, targetName) -> {
+            if (plugin.isImmune(sender, targetUuid)) {
+                sender.sendMessage(config.getMessage("cannot-target-staff"));
+                return;
             }
+            if (sender instanceof Player && ((Player) sender).getUniqueId().equals(targetUuid)) {
+                sender.sendMessage(config.getPrefix() + config.colorize("&cSiz o'zingizni ban qila olmaysiz!"));
+                return;
+            }
+            String ip = plugin.getAltManager().getLatestIp(targetUuid);
+            Player targetOnline = Bukkit.getPlayer(targetUuid);
+            if (targetOnline != null && targetOnline.isOnline() && targetOnline.getAddress() != null) {
+                ip = DataFiles.ip(targetOnline);
+            }
+            plugin.getPunishmentManager().createPunishment(PunishmentType.BAN, targetUuid, targetName, ip, sender,
+                    parsed.reason(), parsed.durationMs(), parsed.silent(), record -> {
+                plugin.getPunishmentFormatter().broadcastPunishment(record);
+                Player now = Bukkit.getPlayer(targetUuid);
+                if (now != null && now.isOnline() && plugin.getPunishmentManager().enforcesBans()) {
+                    now.kickPlayer(plugin.getPunishmentFormatter().buildBanScreen(record));
+                }
+            });
         });
-
         return true;
     }
 

@@ -28,6 +28,8 @@ public final class JdbcPunishmentStore {
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_player_ips (player_uuid VARCHAR(36) NOT NULL, ip VARCHAR(64) NOT NULL, first_ms BIGINT NOT NULL, PRIMARY KEY (player_uuid, ip), INDEX sg_ip_players (ip)) ENGINE=InnoDB");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_sus (player_uuid VARCHAR(36) PRIMARY KEY, name VARCHAR(64) NOT NULL, is_active BOOLEAN NOT NULL, first_ms BIGINT NOT NULL, last_ms BIGINT NOT NULL) ENGINE=InnoDB");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_sus_log (id BIGINT AUTO_INCREMENT PRIMARY KEY, player_uuid VARCHAR(36) NOT NULL, reason VARCHAR(512) NOT NULL, staff VARCHAR(128) NOT NULL, ts_ms BIGINT NOT NULL, INDEX sg_sus_log_player (player_uuid)) ENGINE=InnoDB");
+            // staff seen on any server, so an offline moderator is protected network-wide (additive, no schema bump)
+            s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_staff (player_uuid VARCHAR(36) PRIMARY KEY, updated_ms BIGINT NOT NULL) ENGINE=InnoDB");
             s.executeUpdate("CREATE TABLE IF NOT EXISTS sg_servers (server_id VARCHAR(128) PRIMARY KEY, enforce_bans BOOLEAN NOT NULL, enforce_mutes BOOLEAN NOT NULL, updated_ms BIGINT NOT NULL) ENGINE=InnoDB");
             int version = schemaVersion(c);
             if (version > SCHEMA_VERSION) throw new SQLException("Database schema " + version + " is newer than this plugin supports (" + SCHEMA_VERSION + ")");
@@ -54,14 +56,19 @@ public final class JdbcPunishmentStore {
             s.executeUpdate("UPDATE sg_outbox SET punishment_id=event_id WHERE punishment_id IS NULL");
             createIndex(s, "CREATE INDEX sg_ip_active ON sg_punishments (ip, kind, revoked)");
             createIndex(s, "CREATE INDEX sg_actor ON sg_punishments (actor)");
-            try { s.executeUpdate("INSERT INTO sg_schema (id, version) VALUES (1, 2)"); }
-            catch (SQLException duplicate) { s.executeUpdate("UPDATE sg_schema SET version=2 WHERE id=1 AND version<2"); }
         }
+        setVersion(c, 2);
     }
     private static void setVersion(Connection c, int version) throws SQLException {
         try (Statement s = c.createStatement()) {
-            try { s.executeUpdate("INSERT INTO sg_schema (id, version) VALUES (1, " + version + ")"); }
-            catch (SQLException exists) { s.executeUpdate("UPDATE sg_schema SET version=" + version + " WHERE id=1 AND version<" + version); }
+            // update first: the driver logs every failed INSERT as a warning, which looked like an error to server owners
+            boolean exists;
+            try (ResultSet rs = s.executeQuery("SELECT 1 FROM sg_schema WHERE id=1")) { exists = rs.next(); }
+            if (exists) s.executeUpdate("UPDATE sg_schema SET version=" + version + " WHERE id=1 AND version<" + version);
+            else {
+                try { s.executeUpdate("INSERT INTO sg_schema (id, version) VALUES (1, " + version + ")"); }
+                catch (SQLException raced) { s.executeUpdate("UPDATE sg_schema SET version=" + version + " WHERE id=1 AND version<" + version); }
+            }
         }
     }
     private static void createIndex(Statement s, String sql) {
@@ -90,8 +97,14 @@ public final class JdbcPunishmentStore {
      * (ban replaces ban/IP-ban, mute replaces mute) are revoked in the same transaction.
      * @return ids of the superseded punishments
      */
-    public List<UUID> create(NetworkPunishment p) throws SQLException {
-        if (p.revoked()) throw new IllegalArgumentException("Cannot create revoked punishment");
+    public List<UUID> create(NetworkPunishment given) throws SQLException {
+        if (given.revoked()) throw new IllegalArgumentException("Cannot create revoked punishment");
+        // IPv6 IP bans cover the subscriber's whole /64 (see IpAddresses.network)
+        NetworkPunishment p = given.type() != NetworkPunishment.Type.IP_BAN || given.ip() == null
+                || Objects.equals(IpAddresses.network(given.ip()), given.ip()) ? given
+                : new NetworkPunishment(given.id(), given.player(), given.playerName(), IpAddresses.network(given.ip()), given.type(),
+                        given.reason(), given.actorId(), given.actor(), given.server(), given.createdAt(), given.expiresAt(),
+                        given.silent(), given.revocation());
         return transaction(c -> {
             List<UUID> replaced = p.type().replaces().isEmpty() ? List.of()
                 : revokeMatching(c, p.player(), p.type() == NetworkPunishment.Type.IP_BAN ? p.ip() : null, p.type().replaces(),
@@ -137,7 +150,8 @@ public final class JdbcPunishmentStore {
         sql.append(String.join(",", Collections.nCopies(types.size(), "?"))).append(") AND (");
         if (player != null) sql.append("player_uuid=?");
         if (player != null && ip != null) sql.append(" OR ");
-        if (ip != null) sql.append("ip=?");
+        List<String> forms = ip == null ? List.of() : IpAddresses.banForms(ip);
+        if (ip != null) sql.append("ip IN (").append(String.join(",", Collections.nCopies(Math.max(1, forms.size()), "?"))).append(")");
         sql.append(") FOR UPDATE");
         List<NetworkPunishment> rows = new ArrayList<>();
         try (PreparedStatement s = c.prepareStatement(sql.toString())) {
@@ -145,7 +159,10 @@ public final class JdbcPunishmentStore {
             s.setLong(i++, now.toEpochMilli());
             for (NetworkPunishment.Type t : types) s.setString(i++, t.name());
             if (player != null) s.setString(i++, player.toString());
-            if (ip != null) s.setString(i, ip);
+            if (ip != null) {
+                if (forms.isEmpty()) s.setString(i, ip);
+                for (String form : forms) s.setString(i++, form);
+            }
             try (ResultSet rs = s.executeQuery()) { while (rs.next()) rows.add(read(rs)); }
         }
         // IP matches only apply to IP bans; a plain ban on another account sharing the IP stays.
@@ -197,12 +214,17 @@ public final class JdbcPunishmentStore {
     }
     /** Active bans that must deny this login: account bans plus IP bans on the address or the account. */
     public List<NetworkPunishment> activeBans(UUID player, String ip, Instant now) throws SQLException {
-        String normalized = IpAddresses.normalize(ip);
-        if (normalized == null)
+        List<String> forms = IpAddresses.banForms(ip);
+        if (forms.isEmpty())
             return query("SELECT " + COLUMNS + " FROM sg_punishments WHERE player_uuid=? AND kind IN ('BAN','IP_BAN') AND " + ACTIVE + " ORDER BY created_ms DESC",
                 player.toString(), now.toEpochMilli());
-        return query("SELECT " + COLUMNS + " FROM sg_punishments WHERE ((player_uuid=? AND kind IN ('BAN','IP_BAN')) OR (ip=? AND kind='IP_BAN')) AND " + ACTIVE + " ORDER BY created_ms DESC",
-            player.toString(), normalized, now.toEpochMilli());
+        List<Object> args = new ArrayList<>();
+        args.add(player.toString());
+        args.addAll(forms);
+        args.add(now.toEpochMilli());
+        return query("SELECT " + COLUMNS + " FROM sg_punishments WHERE ((player_uuid=? AND kind IN ('BAN','IP_BAN')) OR (ip IN ("
+            + String.join(",", Collections.nCopies(forms.size(), "?")) + ") AND kind='IP_BAN')) AND " + ACTIVE + " ORDER BY created_ms DESC",
+            args.toArray());
     }
     /** Batched active-ban lookup for reconciliation of many online players. */
     public List<NetworkPunishment> activeBans(Collection<UUID> players, Instant now) throws SQLException {
@@ -221,7 +243,7 @@ public final class JdbcPunishmentStore {
     }
     /** Batched active IP-ban lookup for reconciliation of many online addresses. */
     public List<NetworkPunishment> activeIpBans(Collection<String> ips, Instant now) throws SQLException {
-        List<String> all = ips.stream().map(IpAddresses::normalize).filter(Objects::nonNull).distinct().toList();
+        List<String> all = ips.stream().flatMap(ip -> IpAddresses.banForms(ip).stream()).distinct().toList();
         List<NetworkPunishment> result = new ArrayList<>();
         for (int from = 0; from < all.size(); from += 500) {
             List<String> chunk = all.subList(from, Math.min(all.size(), from + 500));
@@ -232,6 +254,25 @@ public final class JdbcPunishmentStore {
                 + " AND ip IN (" + String.join(",", Collections.nCopies(chunk.size(), "?")) + ")", args));
         }
         return List.copyOf(result);
+    }
+    /** Records whether a player holds a staff permission (seen on join or quit on any server). */
+    public void setStaff(UUID player, boolean staff, Instant now) throws SQLException {
+        transaction(c -> {
+            try (PreparedStatement d = c.prepareStatement("DELETE FROM sg_staff WHERE player_uuid=?")) {
+                d.setString(1, player.toString()); d.executeUpdate();
+            }
+            if (staff) try (PreparedStatement i = c.prepareStatement("INSERT INTO sg_staff (player_uuid, updated_ms) VALUES (?,?)")) {
+                i.setString(1, player.toString()); i.setLong(2, now.toEpochMilli()); i.executeUpdate();
+            }
+            return null;
+        });
+    }
+    public Set<UUID> staff() throws SQLException {
+        Set<UUID> out = new HashSet<>();
+        try (Connection c = source.getConnection(); Statement s = c.createStatement(); ResultSet rs = s.executeQuery("SELECT player_uuid FROM sg_staff")) {
+            while (rs.next()) out.add(UUID.fromString(rs.getString(1)));
+        }
+        return out;
     }
     public List<NetworkPunishment> history(UUID player, int limit) throws SQLException {
         return query("SELECT " + COLUMNS + " FROM sg_punishments WHERE player_uuid=? ORDER BY created_ms DESC LIMIT " + Math.max(1, limit), player.toString());

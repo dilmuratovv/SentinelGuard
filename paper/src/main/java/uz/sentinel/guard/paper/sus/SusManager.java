@@ -219,14 +219,8 @@ public class SusManager {
                 long firstAdded = pSec.getLong("first-added", System.currentTimeMillis());
                 long lastAdded = pSec.getLong("last-added", System.currentTimeMillis());
                 
-                LinkedHashMap<String, Integer> reasons = new LinkedHashMap<>();
-                ConfigurationSection reasonsSec = pSec.getConfigurationSection("reasons");
-                if (reasonsSec != null) {
-                    for (String rKey : reasonsSec.getKeys(false)) {
-                        reasons.put(rKey, reasonsSec.getInt(rKey));
-                    }
-                }
-                
+                LinkedHashMap<String, Integer> reasons = readReasons(pSec);
+
                 List<SusLogEntry> history = new ArrayList<>();
                 List<Map<?, ?>> historyList = pSec.getMapList("history");
                 for (Map<?, ?> hMap : historyList) {
@@ -244,6 +238,45 @@ public class SusManager {
             }
         }
         dirty.set(false);
+    }
+
+    /**
+     * Reasons are free text ("fly v2.0", "reach 3.5"), and a '.' in a YAML key is a path separator, so they are stored
+     * as a list of {reason, count} maps instead of section keys.
+     */
+    static void writeReasons(ConfigurationSection pSec, Map<String, Integer> reasons) {
+        List<Map<String, Object>> list = new ArrayList<>(reasons.size());
+        for (Map.Entry<String, Integer> r : reasons.entrySet()) {
+            Map<String, Object> m = new LinkedHashMap<>(2);
+            m.put("reason", r.getKey());
+            m.put("count", r.getValue());
+            list.add(m);
+        }
+        pSec.set("reasons", list);
+    }
+
+    /**
+     * Reads the list format, and the section format of older versions. In the old format a reason with a '.' was
+     * split into nested sections; the full leaf path is exactly the original reason, so it is recovered as such.
+     */
+    static LinkedHashMap<String, Integer> readReasons(ConfigurationSection pSec) {
+        LinkedHashMap<String, Integer> reasons = new LinkedHashMap<>();
+        if (pSec.isList("reasons")) {
+            for (Map<?, ?> m : pSec.getMapList("reasons")) {
+                Object reason = m.get("reason"), count = m.get("count");
+                if (reason == null) continue;
+                reasons.merge(String.valueOf(reason), count instanceof Number n ? n.intValue() : 1, Integer::sum);
+            }
+            return reasons;
+        }
+        ConfigurationSection legacy = pSec.getConfigurationSection("reasons");
+        if (legacy != null) {
+            for (String path : legacy.getKeys(true)) {
+                if (legacy.isConfigurationSection(path)) continue;
+                reasons.merge(path, legacy.getInt(path), Integer::sum);
+            }
+        }
+        return reasons;
     }
 
     public void saveData() {
@@ -265,10 +298,7 @@ public class SusManager {
                     pSec.set("first-added", entry.getFirstAddedTime());
                     pSec.set("last-added", entry.getLastAddedTime());
 
-                    ConfigurationSection rSec = pSec.createSection("reasons");
-                    for (Map.Entry<String, Integer> r : entry.getReasons().entrySet()) {
-                        rSec.set(r.getKey(), r.getValue());
-                    }
+                    writeReasons(pSec, entry.getReasons());
 
                     List<Map<String, Object>> historyList = new ArrayList<>();
                     for (SusLogEntry h : entry.getHistory()) {
