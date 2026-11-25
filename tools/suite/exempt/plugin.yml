@@ -1,0 +1,4 @@
+name: SuiteExempt
+version: '1.0'
+main: uz.sentinel.test.SuiteExempt
+api-version: '1.21'
