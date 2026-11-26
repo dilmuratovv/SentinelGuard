@@ -17,7 +17,9 @@ public class CommandOverrideListener implements Listener {
             "minecraft:ban", "essentials:ban", "minecraft:tempban", "essentials:tempban",
             "minecraft:unban", "essentials:unban", "minecraft:pardon", "essentials:pardon",
             "minecraft:mute", "essentials:mute", "minecraft:tempmute", "essentials:tempmute",
-            "minecraft:unmute", "essentials:unmute", "minecraft:kick", "essentials:kick"
+            "minecraft:unmute", "essentials:unmute", "minecraft:kick", "essentials:kick",
+            "minecraft:ban-ip", "essentials:ban-ip", "minecraft:pardon-ip", "essentials:pardon-ip",
+            "essentials:unbanip", "essentials:ipban"
     ));
 
     public CommandOverrideListener(GuardPlugin plugin) {

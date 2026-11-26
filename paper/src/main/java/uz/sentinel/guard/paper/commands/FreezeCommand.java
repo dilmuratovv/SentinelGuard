@@ -79,17 +79,20 @@ public class FreezeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (plugin.isImmune(sender, targetUuid)) {
-            sender.sendMessage(config.getMessage("cannot-target-staff"));
-            return true;
-        }
-
-        plugin.setFrozen(targetUuid, targetName, true, sender, ok -> {
-            if (ok) {
-                sender.sendMessage(config.getMessage("freeze-success").replace("{player}", targetName));
-            } else {
-                sender.sendMessage(config.getMessage("already-frozen").replace("{player}", targetName));
+        UUID frozenUuid = targetUuid;
+        String frozenName = targetName;
+        plugin.getStaffRegistry().whenKnown(frozenUuid, () -> {
+            if (plugin.isImmune(sender, frozenUuid)) {
+                sender.sendMessage(config.getMessage("cannot-target-staff"));
+                return;
             }
+            plugin.setFrozen(frozenUuid, frozenName, true, sender, ok -> {
+                if (ok) {
+                    sender.sendMessage(config.getMessage("freeze-success").replace("{player}", frozenName));
+                } else {
+                    sender.sendMessage(config.getMessage("already-frozen").replace("{player}", frozenName));
+                }
+            });
         });
         return true;
     }

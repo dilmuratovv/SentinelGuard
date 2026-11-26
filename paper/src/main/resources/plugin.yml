@@ -89,7 +89,7 @@ commands:
 
   unbanip:
     description: Unban an IP address.
-    aliases: [ pardonip ]
+    aliases: [ pardonip, pardon-ip ]
     permission: guard.unbanip
     usage: /unbanip <ip> [reason] [-s]
 

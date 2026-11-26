@@ -57,20 +57,23 @@ public class KickCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(config.getMessage("player-not-found"));
                 return true;
             }
-            if (plugin.isImmune(sender, remote)) {
-                sender.sendMessage(config.getMessage("cannot-target-staff"));
-                return true;
-            }
             if (sender instanceof Player && ((Player) sender).getUniqueId().equals(remote)) {
                 sender.sendMessage(config.getPrefix() + config.colorize("&cSiz o'zingizni kick qila olmaysiz!"));
                 return true;
             }
-            plugin.getPunishmentManager().createPunishment(
-                    PunishmentType.KICK, remote, targetName, plugin.getAltManager().getLatestIp(remote), sender, reason, 0, silent,
-                    record -> {
-                        plugin.getPunishmentFormatter().broadcastPunishment(record);
-                        sender.sendMessage(config.getPrefix() + config.colorize("&aKick signali yuborildi (o'yinchi boshqa serverda bo'lishi mumkin)."));
-                    });
+            boolean quiet = silent;
+            plugin.getStaffRegistry().whenKnown(remote, () -> {
+                if (plugin.isImmune(sender, remote)) {
+                    sender.sendMessage(config.getMessage("cannot-target-staff"));
+                    return;
+                }
+                plugin.getPunishmentManager().createPunishment(
+                        PunishmentType.KICK, remote, targetName, plugin.getAltManager().getLatestIp(remote), sender, reason, 0, quiet,
+                        record -> {
+                            plugin.getPunishmentFormatter().broadcastPunishment(record);
+                            sender.sendMessage(config.getPrefix() + config.colorize("&aKick signali yuborildi (o'yinchi boshqa serverda bo'lishi mumkin)."));
+                        });
+            });
             return true;
         }
 

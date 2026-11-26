@@ -7,7 +7,9 @@
 
 Covers: freeze (quit, timeout, anticheat-style kick, staff kick, return, vehicle/pearl/portal/glide, mid-air flight,
 offline unfreeze, server stop), mute (chat, private and party/clan commands, signs, books, anvil rename, with an
-unmuted control), duration typos, offline staff immunity, unknown-name bans, IPv6 /64 IP bans and shared-IP guard.
+unmuted control), duration typos, offline staff immunity, unknown-name bans, IPv6 /64 IP bans and shared-IP guard,
+vanilla ban commands from the console (/minecraft:ban, ban-ip, pardon, pardon-ip go through Guard), and with
+--luckperms-stub (tools/live/lpstub) staff known only to LuckPerms storage, checked without stalling the main thread.
 The server listens on ::1 only. Never point the bots at a real server.
 """
 import argparse, os, queue, re, shutil, subprocess, sys, threading, time, zipfile
@@ -91,7 +93,7 @@ class Run:
             shutil.copytree(libs, self.server / 'libraries')
         plugins = self.server / 'plugins'
         plugins.mkdir(parents=True)
-        for jar in [self.a.jar, self.a.probe] + self.a.via + ([self.a.ac] if self.a.ac else []):
+        for jar in [self.a.jar, self.a.probe] + self.a.via + ([self.a.ac] if self.a.ac else []) + ([self.a.luckperms_stub] if self.a.luckperms_stub else []):
             shutil.copy2(jar, plugins / jar.name)
         if self.a.mojang_cache:
             shutil.copytree(self.a.mojang_cache, self.server / 'cache')
@@ -109,6 +111,10 @@ class Run:
         cfg = cfg.replace('shared-ip-accounts: 6', 'shared-ip-accounts: 3')
         assert f'return-grace-seconds: {GRACE}' in cfg and 'shared-ip-accounts: 3' in cfg
         (plugins / 'SentinelGuard').mkdir()
+        if self.a.luckperms_stub:  # staff in LuckPerms storage; loading a user takes longer than a tick could wait
+            (plugins / 'LuckPerms').mkdir()
+            (plugins / 'LuckPerms' / 'staff.txt').write_text('Mod\nLpAdmin\n')
+            (plugins / 'LuckPerms' / 'delay-ms').write_text('1500\n')
         (plugins / 'SentinelGuard' / 'config.yml').write_text(cfg)
 
     def start(self):
@@ -175,6 +181,7 @@ def main():
     p.add_argument('--probe', type=Path, required=True)
     p.add_argument('--via', type=Path, action='append', default=[])
     p.add_argument('--ac', type=Path)
+    p.add_argument('--luckperms-stub', type=Path)
     p.add_argument('--mojang-cache', type=Path)
     p.add_argument('--work', type=Path, required=True)
     p.add_argument('--client-version', default='26.1')
@@ -195,7 +202,7 @@ def main():
         for name, fn in scenarios:
             if (a.only and name not in a.only.split(',')) or (name == 'walk' and 'walk' not in a.only):
                 continue
-            if name == 'ac' and not a.ac:
+            if (name == 'ac' and not a.ac) or (name == 'luckperms' and not a.luckperms_stub):
                 continue
             print(f'== {name}', flush=True)
             try:
@@ -205,6 +212,15 @@ def main():
         if not a.only or 'restart' in a.only.split(','):
             print('== restart', flush=True)
             restart(r)
+        # after the restart: they take longer than the freeze grace, which would ban the frozen Stopper waiting for it
+        for name, fn in [('vanilla', vanilla), ('luckperms', luckperms)]:
+            if (a.only and name not in a.only.split(',')) or (name == 'luckperms' and not a.luckperms_stub):
+                continue
+            print(f'== {name}', flush=True)
+            try:
+                fn(r)
+            except Exception as e:
+                check(name + '-scenario-crashed', False, repr(e))
         r.cmd('gp tick')
     finally:
         r.stop()
@@ -485,6 +501,59 @@ def ip_rules(r):
     back = r.bot('AltFive', wait=False)
     check('unbanip-by-address-lifts-network-ban', back.expect(r'^POS ', 25, 0) is not None)
     back.send('quit'); r.gone('AltFive')
+
+
+def vanilla(r):
+    """Vanilla's ban commands from the console (and command blocks) land in Guard, not in banned-players.json."""
+    r.cmd('minecraft:ban VanOne vanilla route'); time.sleep(4)  # unknown name: looked up (and LuckPerms asked) first
+    st = r.state('VanOne')
+    check('console-minecraft-ban-goes-through-guard', 'banned=true' in st and 'vanilla route' in st, st)
+    vanilla_list = (r.server / 'banned-players.json').read_text() if (r.server / 'banned-players.json').exists() else ''
+    check('console-minecraft-ban-not-in-vanilla-list', 'VanOne' not in vanilla_list, vanilla_list[:200])
+    r.cmd('minecraft:pardon VanOne'); time.sleep(3)
+    check('console-minecraft-pardon-goes-through-guard', 'banned=false' in r.state('VanOne'))
+    two = r.bot('VanTwo')
+    m = two.mark()
+    r.cmd('minecraft:ban-ip VanTwo 1d vanilla ip -f')
+    check('console-minecraft-ban-ip-goes-through-guard', two.expect(r'^KICK ', 10, m) is not None)
+    r.gone('VanTwo', 15)
+    ips = (r.server / 'banned-ips.json').read_text() if (r.server / 'banned-ips.json').exists() else ''
+    check('console-minecraft-ban-ip-not-in-vanilla-list', '::1' not in ips and '0:0:0:0' not in ips, ips[:200])
+    r.cmd('pardon-ip ::1'); time.sleep(1.5)  # vanilla's own name, unprefixed
+    back = r.bot('VanThree', wait=False)
+    check('console-pardon-ip-goes-through-guard', back.expect(r'^POS ', 25, 0) is not None)
+    back.send('quit'); r.gone('VanThree')
+
+
+def luckperms(r):
+    """Staff known only to LuckPerms storage (never joined here): protected, and the check never stalls a tick."""
+    r.gp('grant Helper guard.ban')  # the probe's grants live in memory: gone after the restart
+    helper = r.bot('Helper')
+    m, ms = helper.mark(), r.s.mark()
+    helper.send('cmd ban LpAdmin 1d abuse')
+    for _ in range(25):  # sample the main thread while the name is looked up and LuckPerms is asked
+        r.cmd('gp tick'); time.sleep(0.1)
+    time.sleep(1)
+    with r.s.cond:
+        ticks = [int(x) for x in re.findall(r'GP tick (\d+)ms', '\n'.join(r.s.lines[ms:]))]
+    check('luckperms-offline-staff-cannot-be-banned', helper.expect(r'Admin/Staff himoyasi', 10, m) is not None)
+    check('luckperms-offline-staff-ban-not-created', 'banned=false' in r.state('LpAdmin'))
+    check('luckperms-check-does-not-stall-main-thread', len(ticks) >= 20 and max(ticks) < 200, f'{len(ticks)} samples, max {max(ticks, default=-1)} ms')
+    load = r.s.expect(r'LPSTUB loaded .* on (.*)', 5, ms)
+    check('luckperms-user-loaded-off-main-thread', load is not None and 'Server thread' not in load.group(1),
+          load.group(0) if load else 'no load')
+    # control: a player LuckPerms knows as a normal player is banned
+    helper.send('cmd ban LpPlayer 1d x'); time.sleep(3)
+    check('luckperms-normal-player-is-banned', 'banned=true' in r.state('LpPlayer'))
+    r.cmd('unban LpPlayer')
+    # demoted while offline: seen as staff here (registry), LuckPerms now says no -> LuckPerms wins
+    r.gp('grant Demoted guard.staff')
+    d = r.bot('Demoted'); d.send('quit'); r.gone('Demoted'); time.sleep(1.5)
+    m = helper.mark()
+    helper.send('cmd ban Demoted 1d x'); time.sleep(3)
+    check('luckperms-demoted-staff-can-be-banned', 'banned=true' in r.state('Demoted'), helper.lines[-1] if helper.lines else '')
+    r.cmd('unban Demoted')
+    helper.send('quit'); r.gone('Helper')
 
 
 def restart(r):

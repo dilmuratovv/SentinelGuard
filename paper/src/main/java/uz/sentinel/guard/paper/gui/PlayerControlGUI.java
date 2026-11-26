@@ -25,6 +25,7 @@ public class PlayerControlGUI implements InventoryHolder {
     private final int returnPage;
 
     public PlayerControlGUI(GuardPlugin plugin, SusEntry targetEntry, int returnPage) {
+        plugin.getStaffRegistry().prefetch(targetEntry.getPlayerUuid()); // the staff check on click must not wait
         this.plugin = plugin;
         this.targetEntry = targetEntry;
         this.returnPage = returnPage;

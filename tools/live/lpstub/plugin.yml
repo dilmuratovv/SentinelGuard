@@ -1,0 +1,5 @@
+name: LuckPerms
+version: 'stub'
+main: uz.sentinel.guard.lpstub.StubPlugin
+api-version: '1.21'
+description: Test-only stand-in for LuckPerms (the few API calls SentinelGuard makes). Never install on a real server.

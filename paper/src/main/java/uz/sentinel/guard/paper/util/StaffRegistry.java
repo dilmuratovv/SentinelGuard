@@ -101,21 +101,64 @@ public final class StaffRegistry {
         return staff.contains(uuid) || networkStaff.contains(uuid);
     }
 
-    /** LuckPerms answer for an offline user, or null when LuckPerms is absent or slow. Read reflectively. */
-    private Boolean luckPerms(UUID uuid) {
-        if (Bukkit.getPluginManager().getPlugin("LuckPerms") == null) return null;
+    /**
+     * Runs {@code then} on the main thread once {@link #isStaff(UUID)} can answer from LuckPerms without waiting:
+     * at once when the player is online, LuckPerms is absent or already has the user loaded; otherwise after
+     * LuckPerms has loaded the user from its storage off the main thread (at most 3 s, then the registry answers).
+     */
+    public void whenKnown(UUID uuid, Runnable then) {
+        java.util.concurrent.CompletableFuture<?> loading = uuid == null || Bukkit.getPlayer(uuid) != null ? null : loadLuckPerms(uuid);
+        if (loading == null || loading.isDone()) { then.run(); return; }
+        loading.copy().orTimeout(3, TimeUnit.SECONDS).whenComplete((user, error) -> {
+            if (!plugin.isEnabled()) return;
+            Bukkit.getScheduler().runTask(plugin, then);
+        });
+    }
+
+    /** Starts loading an offline user into LuckPerms so a later staff check finds it (GUIs call this on open). */
+    public void prefetch(UUID uuid) {
+        if (uuid != null && Bukkit.getPlayer(uuid) == null) loadLuckPerms(uuid);
+    }
+
+    /** LuckPerms' user manager, or null when LuckPerms is absent. Read reflectively (no compile dependency). */
+    private Object luckPermsUsers() {
+        org.bukkit.plugin.Plugin lp = Bukkit.getPluginManager().getPlugin("LuckPerms");
+        if (lp == null || !lp.isEnabled()) return null;
         try {
-            Class<?> provider = Class.forName("net.luckperms.api.LuckPermsProvider", true,
-                    Bukkit.getPluginManager().getPlugin("LuckPerms").getClass().getClassLoader());
+            Class<?> provider = Class.forName("net.luckperms.api.LuckPermsProvider", true, lp.getClass().getClassLoader());
             Object api = provider.getMethod("get").invoke(null);
-            Object users = api.getClass().getMethod("getUserManager").invoke(api);
+            return api.getClass().getMethod("getUserManager").invoke(api);
+        } catch (Exception | LinkageError e) {
+            return null;
+        }
+    }
+
+    /** Null when nothing needs loading (LuckPerms absent, or the user already loaded); else the load in progress. */
+    private java.util.concurrent.CompletableFuture<?> loadLuckPerms(UUID uuid) {
+        Object users = luckPermsUsers();
+        if (users == null) return null;
+        try {
+            if (users.getClass().getMethod("getUser", UUID.class).invoke(users, uuid) != null) return null;
+            return (java.util.concurrent.CompletableFuture<?>) users.getClass().getMethod("loadUser", UUID.class).invoke(users, uuid);
+        } catch (Exception | LinkageError e) {
+            return null;
+        }
+    }
+
+    /**
+     * LuckPerms answer for an offline user, or null when LuckPerms is absent or does not have the user loaded yet.
+     * Never waits: a missing user is loaded in the background (for the next check) and the registry answers now;
+     * commands go through {@link #whenKnown} first, so they get the LuckPerms answer.
+     */
+    private Boolean luckPerms(UUID uuid) {
+        Object users = luckPermsUsers();
+        if (users == null) return null;
+        try {
             Object user = users.getClass().getMethod("getUser", UUID.class).invoke(users, uuid);
             if (user == null) {
-                Object future = users.getClass().getMethod("loadUser", UUID.class).invoke(users, uuid);
-                // a staff command waits at most this long for LuckPerms storage
-                user = ((java.util.concurrent.CompletableFuture<?>) future).get(400, TimeUnit.MILLISECONDS);
+                users.getClass().getMethod("loadUser", UUID.class).invoke(users, uuid);
+                return null;
             }
-            if (user == null) return null;
             Object cached = user.getClass().getMethod("getCachedData").invoke(user);
             Object data = cached.getClass().getMethod("getPermissionData").invoke(cached);
             for (String permission : STAFF_PERMISSIONS) {

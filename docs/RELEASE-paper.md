@@ -1,5 +1,7 @@
-SentinelGuard 2.3.1 for Paper: the moderation hub of the Sentinel suite. This release closes the escape routes and
+SentinelGuard 2.3.2 for Paper: the moderation hub of the Sentinel suite. This release closes the escape routes and
 loopholes a determined player or a careless command could use.
+
+**2.3.2:** vanilla's ban commands can no longer go around Guard: `/minecraft:ban`, `/minecraft:ban-ip`, `/minecraft:pardon`, `/minecraft:pardon-ip` and the unprefixed `/pardon-ip` are Guard commands now, from the console and command blocks too (before, only players typing them were redirected, and `/pardon-ip`, `/minecraft:ban-ip` were not), so every ban gets Guard's record, staff immunity and network sync. `/minecraft:kick` deliberately stays vanilla: plugins such as anticheats use it, and a frozen player kicked that way must still come back or be banned. Checking whether an offline player is staff with LuckPerms no longer stalls the server: the user is loaded from LuckPerms storage off the main thread and the command continues when the answer is there (before, the main thread waited up to 400 ms and then fell back to the local registry, so staff known only to LuckPerms storage could be banned when the storage was slower).
 
 **2.3.1:** database connections are probed every 20 s and replaced after 240 s (`network.database.keepalive-seconds`, `max-lifetime-seconds`), so hosts that close idle connections no longer cause `4031 ... inactivity` warnings. Nothing else changed from 2.3.0.
 

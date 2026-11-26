@@ -20,6 +20,7 @@ public class QuickPunishGUI implements InventoryHolder {
     private final int returnPage;
 
     public QuickPunishGUI(GuardPlugin plugin, SusEntry targetEntry, int returnPage) {
+        plugin.getStaffRegistry().prefetch(targetEntry.getPlayerUuid()); // the staff check on click must not wait
         this.plugin = plugin;
         this.targetEntry = targetEntry;
         this.returnPage = returnPage;

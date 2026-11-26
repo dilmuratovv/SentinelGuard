@@ -1,4 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><parent><groupId>uz.sentinel.guard</groupId><artifactId>sentinelguard-parent</artifactId><version>2.3.1</version></parent><artifactId>sentinelguard-paper</artifactId>
+<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><parent><groupId>uz.sentinel.guard</groupId><artifactId>sentinelguard-parent</artifactId><version>2.3.2</version></parent><artifactId>sentinelguard-paper</artifactId>
 <dependencies>
 <dependency><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId><version>${paper.version}</version><scope>provided</scope></dependency>
 <dependency><groupId>uz.sentinel.guard</groupId><artifactId>sentinelguard-common</artifactId><version>${project.version}</version></dependency>

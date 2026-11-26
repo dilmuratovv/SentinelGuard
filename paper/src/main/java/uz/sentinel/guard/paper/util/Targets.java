@@ -49,7 +49,8 @@ public final class Targets {
     public static void resolve(GuardPlugin plugin, CommandSender sender, String name, BiConsumer<UUID, String> then) {
         Resolved now = known(plugin, name);
         if (now != null) {
-            then.accept(now.uuid(), now.name());
+            // the staff check in {@code then} must not wait on LuckPerms storage on the main thread
+            plugin.getStaffRegistry().whenKnown(now.uuid(), () -> then.accept(now.uuid(), now.name()));
             return;
         }
         if (!NAME.matcher(name).matches()) {
@@ -70,7 +71,8 @@ public final class Targets {
                     sender.sendMessage(plugin.getConfigManager().getMessage("player-not-found"));
                     return;
                 }
-                then.accept(result.getUniqueId(), result.getName() != null ? result.getName() : name);
+                String shown = result.getName() != null ? result.getName() : name;
+                plugin.getStaffRegistry().whenKnown(result.getUniqueId(), () -> then.accept(result.getUniqueId(), shown));
             });
         });
     }
