@@ -412,6 +412,10 @@ network:
     username: "sentinelguard"
     password: ""
     pool-size: 4
+    # Hosts close idle database connections after 30-60 s (MariaDB wait_timeout). Each connection is probed this often
+    # and replaced before max-lifetime, so "disconnected by the server because of inactivity" warnings do not appear.
+    keepalive-seconds: 20
+    max-lifetime-seconds: 240
   # If the database is unreachable: true = deny logins (bans are never bypassed), false = allow.
   deny-login-on-database-error: true
   database-error-login: "&cModeratsiya xizmati vaqtincha ishlamayapti. Keyinroq qayta urinib ko'ring."

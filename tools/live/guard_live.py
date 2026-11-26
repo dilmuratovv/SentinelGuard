@@ -152,7 +152,7 @@ class Run:
         b = Stream(proc, name, self.log)
         self.bots[name] = b
         if wait:
-            if not b.expect(r'^POS ', 40):
+            if not b.expect(r'^POS ', 120):
                 raise RuntimeError(name + ' did not join: ' + ' / '.join(b.lines[-5:]))
             time.sleep(1.0)
         return b

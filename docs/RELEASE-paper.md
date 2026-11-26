@@ -1,5 +1,7 @@
-SentinelGuard 2.3 for Paper: the moderation hub of the Sentinel suite. This release closes the escape routes and
+SentinelGuard 2.3.1 for Paper: the moderation hub of the Sentinel suite. This release closes the escape routes and
 loopholes a determined player or a careless command could use.
+
+**2.3.1:** database connections are probed every 20 s and replaced after 240 s (`network.database.keepalive-seconds`, `max-lifetime-seconds`), so hosts that close idle connections no longer cause `4031 ... inactivity` warnings. Nothing else changed from 2.3.0.
 
 **Freeze (screenshare checks)**
 - A frozen player who **quits** is banned at once. One who **loses connection, crashes or is kicked by an anticheat**
@@ -50,4 +52,4 @@ scenarios, each with an unmuted or unfrozen control), and on a Velocity network 
 One JAR for Paper 1.21 through 26.3 (Java 21; Java 25 on 26.x). Upgrade the Velocity plugin to 2.3.0 too: it now
 enforces freeze across the network.
 
-The attached JAR is signed with the Sentinel suite certificate (`CN=Sentinel Suite`, SHA-256 `64:10:FE:2E:43:F2:23:F6:BD:55:94:BA:20:26:F2:54:0B:36:D7:26:F1:2D:69:4E:4C:B5:BF:22:03:C3:82:91`, self-signed). Check with `jarsigner -verify -certs SentinelGuard-2.3.0-paper.jar`. Checksums are in `SHA256SUMS.txt`.
+The attached JAR is signed with the Sentinel suite certificate (`CN=Sentinel Suite`, SHA-256 `64:10:FE:2E:43:F2:23:F6:BD:55:94:BA:20:26:F2:54:0B:36:D7:26:F1:2D:69:4E:4C:B5:BF:22:03:C3:82:91`, self-signed). Check with `jarsigner -verify -certs SentinelGuard-2.3.1-paper.jar`. Checksums are in `SHA256SUMS.txt`.

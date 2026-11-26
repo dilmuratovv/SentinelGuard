@@ -66,6 +66,10 @@ public final class NetworkService implements AutoCloseable {
         config.setMaximumPoolSize(poolSize);
         config.setConnectionTimeout(3000);
         config.setValidationTimeout(2000);
+        // Hosts close idle connections after as little as 30-60 s (MariaDB wait_timeout); a connection is probed every
+        // 20 s so it never idles that long, and replaced before it can reach the limit (maxLifetime counts from creation).
+        config.setKeepaliveTime(Math.max(10_000L, db.getLong("keepalive-seconds", 20L) * 1000L));
+        config.setMaxLifetime(Math.max(config.getKeepaliveTime() + 10_000L, db.getLong("max-lifetime-seconds", 240L) * 1000L));
         config.addDataSourceProperty("connectTimeout", "3000");
         config.addDataSourceProperty("socketTimeout", "5000");
         AtomicInteger threads = new AtomicInteger();

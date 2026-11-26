@@ -1,5 +1,6 @@
-SentinelGuard 2.3 for Velocity: the proxy now enforces freeze across the network.
+SentinelGuard 2.3.1 for Velocity: the proxy now enforces freeze across the network.
 
+- 2.3.1: database connections are probed every 20 s and replaced after 240 s (no more idle-timeout warnings).
 - **No server switches while frozen.** A player with an active network freeze cannot move to another server
   (`freezeSwitchMessage`).
 - **Leaving the network while frozen.** Only the proxy can tell leaving the network from switching servers, so it
