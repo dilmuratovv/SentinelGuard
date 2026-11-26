@@ -1,7 +1,7 @@
 #!/bin/bash
 # Whole-suite regression: every plugin's own live test, run with the other four signed plugins installed on the
 # same server. Usage: suite.sh [versions...] (default: 26.3 1.21.11 1.21.1); ONLY=ae,axray,refresh,mining,ad,guard
-L=/home/kali/MC/sentinel-testlab; S="/home/kali/MC/0plugins/Sentinel Suite"; W=$L/suite-final
+L="${SENTINEL_LAB:-$HOME/sentinel-testlab}"; S="${SENTINEL_SUITE:-$(cd "$(dirname "$0")/../../.." && pwd)/..}"; W=$L/suite-final
 AC="$S/SentinelAC/builds/SentinelAC-2.8.0-paper.jar"; AD="$S/SentinelAD/builds/SentinelAD-1.3.1-paper.jar"
 AE="$S/SentinelAE/builds/SentinelAE-2.1.2-paper.jar"; AX="$S/SentinelAX-ray/builds/SentinelAX-ray-2.2.2-paper.jar"
 GD="$S/SentinelGuard/builds/SentinelGuard-2.3.2-paper.jar"
