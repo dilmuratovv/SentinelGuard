@@ -118,7 +118,7 @@ Put the password in the URI and keep Redis off public networks.
 ### Good to know
 
 - **Keep server clocks synchronized (NTP).** Temporary bans and mutes can end a few seconds early or late if server clocks differ.
-- **Immunity:** staff (`guard.admin.bypass`, `guard.admin`, `guard.staff`, `sus.admin` or operator) cannot be punished by other staff, also while offline: everyone seen with one of these permissions is remembered (`staff.txt`, shared through the database in network mode), and LuckPerms is asked directly when installed.
+- **Immunity:** staff (`guard.admin.bypass`, `guard.admin`, `guard.staff`, `sus.admin` or operator) cannot be punished by other staff, also while offline: everyone seen with one of these permissions is remembered (`staff.txt`, shared through the database in network mode), and LuckPerms is asked directly when installed (the user is loaded off the main thread; the command continues once LuckPerms answers).
 - **Unknown players:** a name that has never joined any server running SentinelGuard is looked up off the main thread (Mojang in online or proxy online mode, an offline UUID otherwise); a name Mojang does not know is reported as not found.
 - **Old data:** the database cleans up old internal records automatically (`network.outbox-retention-days`, default 7).
 
@@ -143,6 +143,8 @@ Put the password in the URI and keep Redis off public networks.
 | `/sus [reload]` · `/addsus <player> <reason>` · `/clearsus` | Suspicious players list. | `sus.admin` |
 | `/freeze <player>` · `/unfreeze <player>` | Freeze a player; unfreeze also works while they are offline. | `sus.admin` |
 | `/sgproxy` (Velocity) | Proxy connection status. | `sentinelguard.proxy.admin` |
+
+Vanilla's ban commands are Guard commands too: `/ban`, `/ban-ip`, `/pardon`, `/pardon-ip` and their `/minecraft:` forms, from players, the console and command blocks, so no ban bypasses Guard's records and immunity. `/minecraft:kick` stays vanilla (anticheats use it; a frozen player kicked that way must come back or is banned).
 
 ## Compatibility
 
