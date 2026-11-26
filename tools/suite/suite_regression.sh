@@ -24,6 +24,8 @@ for ver in ${@:-26.3 1.21.11 1.21.1}; do
     1.21.1) jar=paper-1.21.1-133.jar; java=$J21; via="--via $VV"; cv=1.21.11; adcv=1.21.11; boat=boat;;
   esac
   P=$L/testdeps/$jar
+  # lab only: Paper 1.21.1 ignores LIB_MIRROR, so fresh servers get the libraries of an earlier run if one is kept
+  if [ -d "$L/libseed/$ver" ]; then export SENTINEL_LIBS_SEED="$L/libseed/$ver"; else unset SENTINEL_LIBS_SEED; fi
   if want ae; then others "$AE"; echo "== $ver AE + others"; (cd "$S/SentinelAE/code"; NODE_PATH=$L/node-ae/node_modules timeout 1200 python3 tools/ae_probe.py --paper $P --java $java --jar "$AE" "${OTH[@]}" $via --mojang-cache $C --work $W/ae-$ver --client-version $cv --boat $boat --restart-first --accept-eula 2>&1 | grep -E "FAIL|DONE|Traceback|Error|error:"); fi
   if want axray; then others "$AX"; echo "== $ver AX-ray + others"; (cd "$S/SentinelAX-ray/code"; NODE_PATH=$L/node-ae/node_modules timeout 1200 python3 tools/axray_probe.py --paper $P --java $java --jar "$AX" "${OTH[@]}" $via --mojang-cache $C --work $W/ax-$ver --client-version $cv --accept-eula 2>&1 | grep -E "FAIL|DONE|Traceback|Error|error:"); fi
   if want refresh; then

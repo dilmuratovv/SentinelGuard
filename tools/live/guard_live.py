@@ -97,6 +97,9 @@ class Run:
             shutil.copy2(jar, plugins / jar.name)
         if self.a.mojang_cache:
             shutil.copytree(self.a.mojang_cache, self.server / 'cache')
+        if os.environ.get('SENTINEL_LIBS_SEED') and not (self.server / 'libraries').exists():
+            # lab only: libraries of an earlier run of this Paper version, so plugins download nothing
+            shutil.copytree(os.environ['SENTINEL_LIBS_SEED'], self.server / 'libraries')
         (self.server / 'eula.txt').write_text('eula=true\n')
         (self.server / 'bukkit.yml').write_text('settings:\n  connection-throttle: -1\n')
         self.port = 25000 + os.getpid() % 5000
@@ -487,9 +490,13 @@ def ip_rules(r):
     check('shared-ip-ban-needs-force', helper.expect(r'umumiy IP', 8, m) is not None)
     time.sleep(1)
     check('shared-ip-ban-not-created', 'banned=false' in r.state('AltOne'))
-    m = bots[1].mark()
+    m, ms = bots[1].mark(), r.s.mark()
     helper.send('cmd ipban AltOne 1d evasion -f')
-    check('forced-ip-ban-kicks-same-network', bots[1].expect(r'^KICK ', 10, m) is not None)
+    # the bot may lose the race to read the kick packet (write EPIPE); the server's own log is the proof
+    other = names[1]
+    kicked = bots[1].expect(r'^KICK ', 10, m) is not None or \
+        r.s.expect(re.escape(other) + r' lost connection: ', 5, ms) is not None and r.s.seen(r'SERVERDAN CHETLASHTIRILDINGIZ \(BAN\)', ms)
+    check('forced-ip-ban-kicks-same-network', kicked)
     st = r.state('AltOne')
     check('ipv6-ban-stored-as-network', 'banned=true' in st, st)
     for n in names + ['Helper']:
