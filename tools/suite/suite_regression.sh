@@ -8,6 +8,9 @@ GD="$S/SentinelGuard/builds/SentinelGuard-2.3.2-paper.jar"
 J21=/usr/lib/jvm/java-21-openjdk-amd64/bin/java; J25=/usr/lib/jvm/java-25-openjdk-amd64/bin/java
 C=$L/smoke/matrix-smoke/shared-cache; VV=$L/testdeps/ViaVersion-5.12.2.jar; VB=$L/testdeps/ViaBackwards-5.12.2.jar
 ONLY="${ONLY:-ae,axray,refresh,mining,ad,guard}"
+# Lab only: LIB_MIRROR=http://127.0.0.1:8765/ (e.g. python3 -m http.server over ~/.m2/repository) lets every fresh test
+# server get SentinelGuard's libraries (HikariCP, MariaDB, Jedis) locally instead of from Maven Central each time.
+[ -n "$LIB_MIRROR" ] && export JAVA_TOOL_OPTIONS="-Dorg.bukkit.plugin.java.LibraryLoader.centralURL=$LIB_MIRROR"
 PR=$L/refresh-probe/SentinelRefreshProbe.jar; LP="--luckperms-stub $L/guard-test/lpstub/LuckPerms-stub.jar"
 want() { [[ ",$ONLY," == *",$1,"* ]]; }
 # scripted bots of the AE/AX-ray/AD probes teleport, so they get AC's exempt permission (AC still runs, sees every
