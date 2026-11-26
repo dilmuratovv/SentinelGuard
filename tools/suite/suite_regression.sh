@@ -2,7 +2,7 @@
 # Whole-suite regression: every plugin's own live test, run with the other four signed plugins installed on the
 # same server. Usage: suite.sh [versions...] (default: 26.3 1.21.11 1.21.1); ONLY=ae,axray,mining,ad,guard
 L=/home/kali/MC/sentinel-testlab; S="/home/kali/MC/0plugins/Sentinel Suite"; W=$L/suite-final
-AC="$S/SentinelAC/builds/SentinelAC-2.8.0-paper.jar"; AD="$S/SentinelAD/builds/SentinelAD-1.3.0-paper.jar"
+AC="$S/SentinelAC/builds/SentinelAC-2.8.0-paper.jar"; AD="$S/SentinelAD/builds/SentinelAD-1.3.1-paper.jar"
 AE="$S/SentinelAE/builds/SentinelAE-2.1.1-paper.jar"; AX="$S/SentinelAX-ray/builds/SentinelAX-ray-2.2.1-paper.jar"
 GD="$S/SentinelGuard/builds/SentinelGuard-2.3.1-paper.jar"
 J21=/usr/lib/jvm/java-21-openjdk-amd64/bin/java; J25=/usr/lib/jvm/java-25-openjdk-amd64/bin/java
@@ -23,7 +23,7 @@ for ver in ${@:-26.3 1.21.11 1.21.1}; do
   if want ae; then others "$AE"; echo "== $ver AE + others"; (cd "$S/SentinelAE/code"; NODE_PATH=$L/node-ae/node_modules timeout 1200 python3 tools/ae_probe.py --paper $P --java $java --jar "$AE" "${OTH[@]}" $via --mojang-cache $C --work $W/ae-$ver --client-version $cv --boat $boat --restart-first --accept-eula 2>&1 | grep -E "FAIL|DONE|Traceback|Error|error:"); fi
   if want axray; then others "$AX"; echo "== $ver AX-ray + others"; (cd "$S/SentinelAX-ray/code"; NODE_PATH=$L/node-ae/node_modules timeout 1200 python3 tools/axray_probe.py --paper $P --java $java --jar "$AX" "${OTH[@]}" $via --mojang-cache $C --work $W/ax-$ver --client-version $cv --accept-eula 2>&1 | grep -E "FAIL|DONE|Traceback|Error|error:"); fi
   if want mining; then others "$AX"; echo "== $ver AX-ray mining + others"; (cd "$S/SentinelAX-ray/code"; NODE_PATH=$L/node-ae/node_modules timeout 1200 python3 tools/mining_probe.py --paper $P --java $java --jar "$AX" --harness $L/axray-test/SentinelAXrayHarness.jar "${OTH[@]}" $via --mojang-cache $C --work $W/mining-$ver --client-version $cv --accept-eula 2>&1 | grep -E "FAIL|DONE|flag|Traceback|Error" | head -12); fi
-  if want ad; then others "$AD"; echo "== $ver AD + others"; (cd "$S/SentinelAD/code"; NODE_PATH="$S/SentinelAC/code/tools/client/node_modules" timeout 1200 python3 tools/dupe_probe.py --paper $P --java $java --jar "$AD" --harness $L/ad-test/SentinelADHarness.jar "${OTH[@]}" $via --mojang-cache $C --work $W/ad-$ver --client-version $adcv --accept-eula 2>&1 | grep -E "FAIL|SKIP|DONE|Traceback"); fi
+  if want ad; then others "$AD"; echo "== $ver AD + others"; (cd "$S/SentinelAD/code"; NODE_PATH="$S/SentinelAC/code/tools/client/node_modules" timeout 1200 python3 tools/dupe_probe.py --paper $P --java $java --jar "$AD" --harness $L/ad-test/h131/SentinelADHarness.jar "${OTH[@]}" $via --mojang-cache $C --work $W/ad-$ver --client-version $adcv --accept-eula 2>&1 | grep -E "FAIL|SKIP|DONE|Traceback"); fi
   if want guard; then echo "== $ver Guard + others"; (cd "$S/SentinelGuard/code"; NODE_PATH="$S/SentinelAC/code/tools/client/node_modules" timeout 1800 python3 tools/live/guard_live.py --paper $P --java $java --jar "$GD" --probe $L/guard-test/GuardProbe.jar --ac "$AC" --via "$AD" --via "$AE" --via "$AX" $via --mojang-cache $C --client-version $adcv --work $W/guard-$ver --accept-eula 2>&1 | grep -E "^(FAIL|DONE)"); fi
 done
 echo "== SUITE DONE"
